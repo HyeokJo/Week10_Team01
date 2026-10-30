@@ -200,6 +200,10 @@ void UAssetManager::LoadAsset(const FString& Key, const FString& Path)
 	{
 		LoadLevelSequence(Path);
 	}
+	if (Extension == ".fbx")
+	{
+
+	}
 }
 
 void UAssetManager::CreateDefaultTextures()

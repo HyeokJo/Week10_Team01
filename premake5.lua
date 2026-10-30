@@ -23,6 +23,9 @@ IncludeDir["stb"]   = "Source/ThirdParty/stb"
 IncludeDir["json"]  = "Source/ThirdParty/json"
 IncludeDir["Lua"]   = "Source/ThirdParty/Lua"
 IncludeDir["sol2"]  = "Source/ThirdParty/sol2"
+IncludeDir["FBX"]  = "Source/ThirdParty/FBXSDK/include"
+
+FbxLibDir = "Source/ThirdParty/FBXSDK/lib/x64"
 
 -- premake의 filter는 project()를 만나면 초기화된다.
 -- 두 프로젝트가 같은 런타임(/MDd vs /MD)으로 컴파일되지 않으면 링크가 실패하므로
@@ -180,6 +183,8 @@ project "HitoriEngine"
     pchheader "EnginePCH.h"
     pchsource "Source/Runtime/EnginePCH.cpp"
 
+    defines { "FBXSDK_SHARED" }
+
     files
     {
         "Source/Runtime/**.h",
@@ -194,6 +199,7 @@ project "HitoriEngine"
         "%{IncludeDir.json}",
         "%{IncludeDir.Lua}",
         "%{IncludeDir.sol2}",
+        "%{IncludeDir.FBX}",
     }
 
     links
@@ -204,6 +210,7 @@ project "HitoriEngine"
         "d3dcompiler.lib",
         "xaudio2.lib",
     }
+
 
 
 -- 에디터 애플리케이션. ObjViewer 구성에서는 같은 exe가 뷰어로 빌드된다.
@@ -247,6 +254,18 @@ project "HitoriEditor"
         "d3dcompiler.lib",
         "xaudio2.lib",
     }
+
+    links { "libfbxsdk" }
+
+    filter "configurations:Debug or Benchmark_Debug or Game_Debug"
+        libdirs { FbxLibDir .. "/debug" }
+        postbuildcommands { "{COPYFILE} %[" .. FbxLibDir .. "/debug/libfbxsdk.dll] %[Build/Bin/" .. outputdir .. "]" }
+
+    filter "configurations:Release or ObjViewer or Benchmark or Game"
+        libdirs { FbxLibDir .. "/release" }
+        postbuildcommands { "{COPYFILE} %[" .. FbxLibDir .. "/release/libfbxsdk.dll] %[Build/Bin/" .. outputdir .. "]" }
+
+    filter {}
 
     filter "configurations:ObjViewer"
         targetname "ObjViewer"
