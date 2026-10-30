@@ -7,6 +7,15 @@
 
 struct FSkeletalMeshData;
 
+// FbxImporter.h
+namespace fbxsdk
+{
+	class FbxManager;
+	class FbxImporter;
+	class FbxIOSettings;
+	class FbxScene;
+}
+
 class FFbxImporter
 {
 public:
@@ -14,6 +23,18 @@ public:
 	static bool DebugPrintScene(const FString& Path);
 
 	static TUniquePtr<FSkeletalMeshData> LoadStaticMeshData(const FString& Path);
+
+	static bool CreateManager(fbxsdk::FbxManager*& InManager);
+
+	static bool CreateImporter(fbxsdk::FbxManager* InManager, fbxsdk::FbxImporter*& InImporter);
+
+	static bool CreateIOSetting(fbxsdk::FbxManager* InManager, fbxsdk::FbxIOSettings*& InIOSetting);
+
+	static bool InitializeImporter(fbxsdk::FbxManager* InManager, fbxsdk::FbxImporter* InImporter, const FString& Path);
+
+	static bool CreateScene(fbxsdk::FbxManager* InManager, fbxsdk::FbxScene*& InScene);
+
+	static bool ImportFbx(fbxsdk::FbxImporter* InImporter, fbxsdk::FbxScene* InScene);
 //
 //	// 디버그용 출력
 //	static void PrintObjInfo(const FObjInfo& ObjInfo);
