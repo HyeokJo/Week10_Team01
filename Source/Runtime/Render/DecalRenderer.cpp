@@ -1,0 +1,60 @@
+#include "EnginePCH.h"
+#include "DecalRenderer.h"
+
+#include "Component/DecalComponent.h"
+#include "Asset/AssetManager.h"
+#include "Render/RenderCommand.h"
+#include "Render/RenderResourceManager.h"
+#include "Render/Texture2D.h"
+bool FDecalRenderer::Init()
+{
+    Shader = FRenderResourceManager::GetShaderProgram("Resources/Shader/DecalProjectionShader.hlsl");
+    if (!Shader)
+    {
+        HTR_LOG(Error, "[Decal] Shader not found");
+        return false;
+    }
+
+    ConstantBuffer = RenderCommand::CreateConstantBuffer(sizeof(FDecalConstants));
+    if (!ConstantBuffer)
+    {
+        HTR_LOG(Error, "[Decal] Constant buffer creation failed");
+        return false;
+    }
+
+    PipelineState.Shader = Shader;
+    PipelineState.Topology = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+    PipelineState.BlendState = EBlendState::AlphaBlend;
+    PipelineState.DepthStencilState = EDepthStencilState::Disabled;
+    PipelineState.RasterizerState = ERasterizerState::SolidNone;
+
+    return true;
+}
+
+void FDecalRenderer::OnRedner(FTexture2D* DepthTexture, const FMatrix& ViewProjection, const UDecalComponent& Decal)
+{
+    if (!DepthTexture || Decal.GetTexturePath().empty())
+    {
+        return;
+    }
+    UTexture2D* DecalTexture = UAssetManager::Get().LoadTexture(Decal.GetTexturePath());
+    if (!DecalTexture)
+    {
+        return;
+    }
+
+    FDecalConstants Constants{};
+    Constants.InverseViewProjection = ViewProjection.Inverse();
+    Constants.WorldToDecal = Decal.GetWorldMatrix().Inverse();
+    Constants.DecalSize = Decal.GetDecalSize();
+    Constants.Opacity = Decal.GetOpacity();
+
+    RenderCommand::BindPipelineState(PipelineState);
+    RenderCommand::BindShaderResource(0, DepthTexture, EShaderBindFlagBits::Pixel);
+    RenderCommand::BindShaderResource(1, DepthTexture, EShaderBindFlagBits::Pixel);
+    RenderCommand::BindSamplerState(0, ESamplerState::LinearClamp, EShaderBindFlagBits::Pixel);
+    RenderCommand::UpdateBufferData(ConstantBuffer.get(), &Constants);
+    RenderCommand::BindConstantBuffer(0, ConstantBuffer.get(), EShaderBindFlagBits::Pixel);
+    RenderCommand::Draw(3);
+
+}

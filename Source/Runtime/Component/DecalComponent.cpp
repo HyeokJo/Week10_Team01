@@ -13,6 +13,11 @@ void UDecalComponent::SetOpacity(float InOpacity)
 	Opacity = FMath::Clamp(InOpacity, 0.0f, 1.0f);
 }
 
+FBox UDecalComponent::CalcLocalBounds() const
+{
+	return FBox{ -DecalSize, DecalSize };
+}
+
 void UDecalComponent::PostEditChangeProperty(const FProperty& Property)
 {
 	Super::PostEditChangeProperty(Property);

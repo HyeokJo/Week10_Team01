@@ -23,6 +23,8 @@ public:
 	const FString& GetTexturePath() const { return TexturePath; }
 	void SetTexturePath(const FString& InPath) { TexturePath = InPath; }
 
+	virtual FBox CalcLocalBounds() const override;
+
 	virtual void PostEditChangeProperty(const FProperty& Property) override;
 protected:
 	FVector DecalSize = FVector(100.0f, 100.0f, 100.0f);
