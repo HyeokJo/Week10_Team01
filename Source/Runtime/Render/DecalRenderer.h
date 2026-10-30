@@ -20,7 +20,7 @@ class FDecalRenderer
 {
 public:
     bool Init();
-    void OnRedner(FTexture2D* DepthTexture, const FMatrix& ViewProjection, const UDecalComponent& Decal);
+    void OnRender(FTexture2D* DepthTexture, const FMatrix& ViewProjection, const UDecalComponent& Decal);
 private:
     FPipelineState PipelineState;
     FShaderProgram* Shader = nullptr;

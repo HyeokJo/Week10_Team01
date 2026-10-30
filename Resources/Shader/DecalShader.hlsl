@@ -1,6 +1,6 @@
 #pragma pack_matrix(row_major)
 
-Texture2D<float> ScnenDepth : register(t0);
+Texture2D<float> SceneDepth : register(t0);
 Texture2D<float4> DecalTexture : register(t1);
 SamplerState DecalSampler : register(s0);
 
@@ -31,7 +31,7 @@ PSInput mainVS(uint VertexID : SV_VertexID)
 
 float4 mainPS(PSInput Input) : SV_Target
 {
-    float Depth = ScnenDepth.Load(int3(Input.Position.xy, 0));
+    float Depth = SceneDepth.Load(int3(Input.Position.xy, 0));
     
     if(Depth >= 1.0f)
         discard;

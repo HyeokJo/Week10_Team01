@@ -17,6 +17,8 @@
 #include "GameFramework/Actor.h"
 #include "Text/TextRenderer.h"
 #include "UObject/UObjectIterator.h"
+#include "DecalRenderer.h"
+#include "Component/DecalComponent.h"
 
 FSceneRenderer::FSceneRenderer() = default;
 
@@ -43,6 +45,9 @@ void FSceneRenderer::Init(FRenderer* InRenderer)
 
 	TextRenderer = MakeUnique<FTextRenderer>();
 	TextRenderer->Init();
+
+	DecalRenderer = MakeUnique<FDecalRenderer>();
+	DecalRenderer->Init();
 }
 
 void FSceneRenderer::BeginFrame()
@@ -117,6 +122,17 @@ void FSceneRenderer::Render(UWorld& World, const FSceneView& SceneView, const FS
 	// 1. 불투명·반투명 Pass (Linear 씬 컬러)
 	RenderOpaquePass(SceneView, Settings, World, SceneInfo, RenderQueue, Lighting.Directional);
 
+	// 데이터 시각화 뷰는 씬 컬러 값 자체가 결과이므로 안개·인코딩·FXAA로 값을 바꾸지 않는다.
+	const EViewMode ViewMode = SceneView.RenderMode.ViewMode;
+	const bool bVisualizeData = IsDataVisualization(ViewMode);
+
+	if (!Settings.bDepthView && !bVisualizeData)
+	{
+		RenderDecalPass(SceneView, Settings, World, SceneInfo);
+	}
+
+	RenderTranslucentPass(SceneView, Settings, World, SceneInfo);
+
 	if (Settings.bDepthView)
 	{
 		// 깊이 시각화는 표시용 타깃을 통째로 덮어쓰므로 인코딩이 필요 없다
@@ -124,10 +140,6 @@ void FSceneRenderer::Render(UWorld& World, const FSceneView& SceneView, const FS
 	}
 	else
 	{
-		// 데이터 시각화 뷰는 씬 컬러 값 자체가 결과이므로 안개·인코딩·FXAA로 값을 바꾸지 않는다.
-		const EViewMode ViewMode = SceneView.RenderMode.ViewMode;
-		const bool bVisualizeData = IsDataVisualization(ViewMode);
-
 		//직교인 경우 안개 Pass를 그리지 않는다.
 		if (!SceneView.bOrthographic && !bVisualizeData && Settings.bExponentialHeightFog)
 			// 2. 안개 Pass (Linear 씬 컬러)
@@ -189,9 +201,7 @@ void FSceneRenderer::RenderOpaquePass(const FSceneView& SceneView, const FSceneR
 		Renderer->RenderQueueSorting(RenderQueue, SceneView.ViewProjection, SceneView.Location);
 		Renderer->RenderOpaque(SceneView.ViewProjection);
 		DrawWorldText(SceneView, ViewWorld);
-		RenderCommand::SetRasterizerState(SceneRasterizerState); // TextRenderer가 상태를 바꾸므로 되돌림
-		Renderer->RenderTranslucent(SceneView.ViewProjection);
-		// 장면 Wireframe이 Grid·Gizmo·UI로 전파되지 않도록 복원한다.
+		RenderCommand::SetRasterizerState(SceneRasterizerState);
 		RenderCommand::SetRasterizerState(ERasterizerState::SolidBack);
 	}
 
@@ -311,5 +321,71 @@ void FSceneRenderer::RenderDepthPass(const FSceneView& SceneView, const FRenderi
 
 	RenderCommand::BeginRenderPass(PassInfo);
 	DepthViewRenderer->OnRender(ViewInfo.DepthStencil.Texture, SceneView.ViewProjection, SceneView.Location, SceneView.Forward);
+	RenderCommand::EndRenderPass();
+}
+
+void FSceneRenderer::RenderDecalPass(const FSceneView& SceneView, const FSceneRenderSettings& Settings, const UWorld& ViewWorld, const FRenderingInfo& SceneInfo)
+{
+	if (!Settings.bDrawPrimitives)
+	{
+		return;
+	}
+	const TArray<UDecalComponent*>& Decals = ViewWorld.GetScene().GetDecalComponents();
+	if (Decals.IsEmpty())
+	{
+		return;
+	}
+
+	FRenderingInfo PassInfo = SceneInfo;
+
+	for (FRenderingDesc& Color : PassInfo.ColorRenderTargets)
+	{
+		Color.LoadOp = ERenderTargetLoadOp::Load;
+	}
+
+	PassInfo.DepthStencil.Texture = nullptr;
+
+	RenderCommand::BeginRenderPass(PassInfo);
+
+	for (UDecalComponent* Decal : Decals)
+	{
+		if (!Decal)
+		{
+			continue;
+		}
+
+		if (ViewWorld.GetWorldType() != EWorldType::Editor && Decal->IsHiddenInGame())
+		{
+			continue;
+		}
+		DecalRenderer->OnRender(SceneInfo.DepthStencil.Texture, SceneView.ViewProjection, *Decal);
+	}
+
+	RenderCommand::EndRenderPass();
+
+	RenderCommand::UnbindShaderResource(0, EShaderBindFlagBits::Pixel);
+	RenderCommand::UnbindShaderResource(1, EShaderBindFlagBits::Pixel);
+}
+
+void FSceneRenderer::RenderTranslucentPass(const FSceneView& SceneView, const FSceneRenderSettings& Settings, const UWorld& ViewWorld, const FRenderingInfo& SceneInfo)
+{
+	if (!Settings.bDrawPrimitives)
+	{
+		return;
+	}
+
+	FRenderingInfo PassInfo = SceneInfo;
+
+	for (FRenderingDesc& Color : PassInfo.ColorRenderTargets)
+	{
+		Color.LoadOp = ERenderTargetLoadOp::Load;
+	}
+
+	PassInfo.DepthStencil.LoadOp = ERenderTargetLoadOp::Load;
+
+	RenderCommand::BeginRenderPass(PassInfo);
+
+	RenderCommand::SetRasterizerState(ERasterizerState::SolidBack);
+	Renderer->RenderTranslucent(SceneView.ViewProjection);
 	RenderCommand::EndRenderPass();
 }

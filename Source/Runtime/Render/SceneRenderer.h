@@ -17,7 +17,7 @@ class FTexture2D;
 struct FRenderingInfo;
 class UWorld;
 class FRenderer;
-
+class FDecalRenderer;
 struct FSceneView
 {
 	FMatrix ViewProjection;
@@ -77,6 +77,9 @@ private:
 	// Depth Pass
 	void RenderDepthPass(const FSceneView& SceneView, const FRenderingInfo& ViewInfo);
 
+	void RenderDecalPass(const FSceneView& SceneView, const FSceneRenderSettings& Settings, const UWorld& ViewWorld, const FRenderingInfo& SceneInfo);
+	void RenderTranslucentPass(const FSceneView& SceneView, const FSceneRenderSettings& Settings, const UWorld& ViewWorld, const FRenderingInfo& SceneInfo);
+
 	FRenderer* Renderer = nullptr;
 	TUniquePtr<FSkyboxRenderer> SkyboxRenderer;
 	TUniquePtr<FFogRenderer> FogRenderer;
@@ -84,7 +87,7 @@ private:
 	TUniquePtr<FGammaEncodeRenderer> GammaEncodeRenderer;
 	TUniquePtr<FDepthViewRenderer> DepthViewRenderer;
 	TUniquePtr<FTextRenderer> TextRenderer;
-
+	TUniquePtr<FDecalRenderer> DecalRenderer;
 	// 여러 View가 아틀라스 하나를 같이 쓰므로 마지막으로 그린 내용을 기억한다.
 	const UWorld* ShadowAtlasWorld = nullptr;
 	TArray<FShadowInfo> ShadowAtlasInfos;

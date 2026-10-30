@@ -31,7 +31,7 @@ bool FDecalRenderer::Init()
     return true;
 }
 
-void FDecalRenderer::OnRedner(FTexture2D* DepthTexture, const FMatrix& ViewProjection, const UDecalComponent& Decal)
+void FDecalRenderer::OnRender(FTexture2D* DepthTexture, const FMatrix& ViewProjection, const UDecalComponent& Decal)
 {
     if (!DepthTexture || Decal.GetTexturePath().empty())
     {
@@ -51,7 +51,7 @@ void FDecalRenderer::OnRedner(FTexture2D* DepthTexture, const FMatrix& ViewProje
 
     RenderCommand::BindPipelineState(PipelineState);
     RenderCommand::BindShaderResource(0, DepthTexture, EShaderBindFlagBits::Pixel);
-    RenderCommand::BindShaderResource(1, DepthTexture, EShaderBindFlagBits::Pixel);
+    RenderCommand::BindShaderResource(1, DecalTexture, EShaderBindFlagBits::Pixel);
     RenderCommand::BindSamplerState(0, ESamplerState::LinearClamp, EShaderBindFlagBits::Pixel);
     RenderCommand::UpdateBufferData(ConstantBuffer.get(), &Constants);
     RenderCommand::BindConstantBuffer(0, ConstantBuffer.get(), EShaderBindFlagBits::Pixel);
