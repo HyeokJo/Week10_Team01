@@ -208,6 +208,33 @@ const FShadowInfo* FScene::GetDirectionalShadowInfo() const
 	return Result;
 }
 
+void FScene::AddDecal(UDecalComponent* Component)
+{
+	if (!Component || DecalComponents.Find(Component) != INDEX_NONE)
+	{
+		return;
+	}
+	DecalComponents.Add(Component);
+}
+
+void FScene::RemoveDecal(UDecalComponent* Component)
+{
+	if (!Component)
+	{
+		return;
+	}
+	const int32 Index = DecalComponents.Find(Component);
+	if (Index != INDEX_NONE)
+	{
+		DecalComponents.RemoveAt(Index);
+	}
+}
+
+void FScene::RemoveAllDecals()
+{
+	DecalComponents.Reset();
+}
+
 void FScene::UpdateAllTransforms()
 {
 	for (FPrimitiveSceneProxy* Proxy : RenderStateDirtyProxies)

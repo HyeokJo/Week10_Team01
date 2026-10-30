@@ -12,6 +12,7 @@
 
 class FLightSceneProxy;
 class ULightComponentBase;
+class UDecalComponent;
 
 struct FExponentialHeightFogSceneInfo
 {
@@ -39,6 +40,11 @@ public:
 	// Ambient와 Directional 라이트 정보를 담는다. (Point·Spot은 BuildStructuredLightAndShadowData에서 처리)
 	void BuildLightingConstants(FLightingConstants& Out) const;
 	const FShadowInfo* GetDirectionalShadowInfo() const;
+
+	void AddDecal(UDecalComponent* Component);
+	void RemoveDecal(UDecalComponent* Component);
+	void RemoveAllDecals();
+	const TArray<UDecalComponent*>& GetDecalComponents() const { return DecalComponents; }
 
 	void UpdateAllTransforms();
 
@@ -77,6 +83,8 @@ public:
 	TArray<FLightSceneProxy*> DirtyLights;
 	// 프록시에 담긴 라이트 색이 어느 작업 흐름으로 계산됐는지. ColorWorkflow::bLinear와 다르면 전부 다시 계산한다.
 	bool bLightColorsLinear = true;
+
+	TArray<UDecalComponent*> DecalComponents;
 
 	// 컬링 결과로 프록시를 바로 내보내 컴포넌트를 역참조하지 않는다. 경계는 Build/Refit 때만 계산한다.
 	TBVH<FPrimitiveSceneProxy*> BVH{

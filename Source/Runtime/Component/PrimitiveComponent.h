@@ -37,6 +37,7 @@ class UPrimitiveComponent :public USceneComponent
 		PROPERTY(ShowBeginOverlapLog)
 		PROPERTY(ShowEndOverlapLog)
 		PROPERTY(ShowHitLog)
+		PROPERTY(bReceiveDecal)
 	REFLECT_END()
 
 public:
@@ -164,4 +165,5 @@ private:
 	bool ShowEndOverlapLog = false;
 	bool ShowHitLog = false;
 	bool bNotifyScriptCollision = true;
+	bool bReceiveDecal = true;
 };
