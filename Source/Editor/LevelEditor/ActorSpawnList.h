@@ -12,12 +12,14 @@
 #include "GameFramework/DefaultPawn.h"
 #include "GameFramework/PlayerStart.h"
 #include "GameFramework/Actor/PlayerActor.h"
+#include "GameFramework/Actor/DecalActor.h"
 #include "GameFramework/Actor/EnemyActor.h"
 #include "Game/Coin.h"
 #include "Game/CoinLauncher.h"
 #include "Game/CoinRain.h"
 #include "Camera/CameraActor.h"
 #include "Sequence/LevelSequenceActor.h"
+
 
 // 에디터에서 바로 스폰할 수 있는 액터 종류. 레벨 툴바의 Add 메뉴와 Editor Controls(Benchmark)가 같이 쓴다.
 struct FSpawnableActorType
@@ -46,5 +48,6 @@ inline constexpr FSpawnableActorType SpawnableActorTypes[] =
 	{ "Camera",               &ACameraActor::StaticClass },
 	{ "Pawn", 				  &APawn::StaticClass },
 	{ "DefaultPawn",          &ADefaultPawn::StaticClass },
-	{ "PlayerStart",          &APlayerStart::StaticClass }
+	{ "PlayerStart",          &APlayerStart::StaticClass },
+	{ "Decal",                &ADecalActor::StaticClass },
 };
