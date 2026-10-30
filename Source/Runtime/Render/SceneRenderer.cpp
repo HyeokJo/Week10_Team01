@@ -128,7 +128,7 @@ void FSceneRenderer::Render(UWorld& World, const FSceneView& SceneView, const FS
 
 	if (!Settings.bDepthView && !bVisualizeData)
 	{
-		RenderDecalPass(SceneView, Settings, World, SceneInfo);
+		RenderDecalPass(SceneView, Settings, World, SceneInfo, FrustumPlanes);
 	}
 
 	RenderTranslucentPass(SceneView, Settings, World, SceneInfo);
@@ -324,7 +324,7 @@ void FSceneRenderer::RenderDepthPass(const FSceneView& SceneView, const FRenderi
 	RenderCommand::EndRenderPass();
 }
 
-void FSceneRenderer::RenderDecalPass(const FSceneView& SceneView, const FSceneRenderSettings& Settings, const UWorld& ViewWorld, const FRenderingInfo& SceneInfo)
+void FSceneRenderer::RenderDecalPass(const FSceneView& SceneView, const FSceneRenderSettings& Settings, const UWorld& ViewWorld, const FRenderingInfo& SceneInfo, const FFrustumPlanes& FrustumPlanes)
 {
 	if (!Settings.bDrawPrimitives)
 	{
@@ -358,6 +358,15 @@ void FSceneRenderer::RenderDecalPass(const FSceneView& SceneView, const FSceneRe
 		{
 			continue;
 		}
+
+		const FBox Bounds = Decal->CalcBounds();
+		const FAABB WorldBounds = MakeWorldBounds(Bounds);
+
+		if (!IsAABBInFrustum(WorldBounds, FrustumPlanes))
+		{
+			continue;
+		}
+
 		DecalRenderer->OnRender(SceneInfo.DepthStencil.Texture, SceneView.ViewProjection, *Decal);
 	}
 

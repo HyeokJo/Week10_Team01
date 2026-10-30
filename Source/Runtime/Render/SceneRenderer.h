@@ -3,7 +3,7 @@
 #include "ShadowFilterSettings.h"
 #include "ViewMode.h"
 #include "Camera/CameraTypes.h"
-
+#include "Math/Frustum.h"
 class FDepthViewRenderer;
 struct FShadowInfo;
 class FTextRenderer;
@@ -77,7 +77,7 @@ private:
 	// Depth Pass
 	void RenderDepthPass(const FSceneView& SceneView, const FRenderingInfo& ViewInfo);
 
-	void RenderDecalPass(const FSceneView& SceneView, const FSceneRenderSettings& Settings, const UWorld& ViewWorld, const FRenderingInfo& SceneInfo);
+	void RenderDecalPass(const FSceneView& SceneView, const FSceneRenderSettings& Settings, const UWorld& ViewWorld, const FRenderingInfo& SceneInfo, const FFrustumPlanes& FrustumPlanes);
 	void RenderTranslucentPass(const FSceneView& SceneView, const FSceneRenderSettings& Settings, const UWorld& ViewWorld, const FRenderingInfo& SceneInfo);
 
 	FRenderer* Renderer = nullptr;

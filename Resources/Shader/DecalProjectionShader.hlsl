@@ -12,6 +12,7 @@ cbuffer DecalConstants : register(b0)
 
     float3 DecalSize;
     float Opacity;
+    float4 BaseColor;
 };
 
 struct PSInput
@@ -53,6 +54,7 @@ float4 mainPS(PSInput Input) : SV_TARGET
     float2 DecalUV = float2(LocalPosition.y / (DecalSize.y * 2.0f) + 0.5f, 0.5f - LocalPosition.z / (DecalSize.z * 2.0f));
 
     float4 Color = DecalTexture.Sample(DecalSampler, DecalUV);
+    Color.rgb *= BaseColor.rgb;
     Color.a *= saturate(Opacity);
 
     if (Color.a <= 0.001f)

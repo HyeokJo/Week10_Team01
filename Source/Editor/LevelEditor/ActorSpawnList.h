@@ -13,6 +13,7 @@
 #include "GameFramework/PlayerStart.h"
 #include "GameFramework/Actor/PlayerActor.h"
 #include "GameFramework/Actor/EnemyActor.h"
+#include "GameFramework/Actor/DecalActor.h"
 #include "Game/Coin.h"
 #include "Game/CoinLauncher.h"
 #include "Game/CoinRain.h"
@@ -33,6 +34,7 @@ inline constexpr FSpawnableActorType SpawnableActorTypes[] =
 	{ "LevelSequence",        &ALevelSequenceActor::StaticClass },
 	{ "Particle",             &AParticleActor::StaticClass },
 	{ "Text",                 &ATextRenderActor::StaticClass },
+	{ "Decal",                &ADecalActor::StaticClass },
 	{ "ExponentialHeightFog", &AExponentialHeightFogActor::StaticClass },
 	{ "AmbientLight",         &AAmbientLightActor::StaticClass },
 	{ "DirectionalLight",     &ADirectionalLightActor::StaticClass },

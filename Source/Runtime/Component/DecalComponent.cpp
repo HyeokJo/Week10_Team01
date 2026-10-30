@@ -1,6 +1,6 @@
 #include "EnginePCH.h"
 #include "DecalComponent.h"
-
+#include "Render/Material.h"
 void UDecalComponent::SetDecalSize(const FVector& InSize)
 {
 	DecalSize.X = FMath::Max(InSize.X, 0.01f);
@@ -24,3 +24,36 @@ void UDecalComponent::PostEditChangeProperty(const FProperty& Property)
 	SetDecalSize(DecalSize);
 	SetOpacity(Opacity);
 }
+
+void UDecalComponent::Serialize(json& Handle, bool bIsLoading)
+{
+	Super::Serialize(Handle, bIsLoading);
+	if (bIsLoading)
+	{
+		if (Handle.contains("DecalMaterial") && Handle["DecalMaterial"].is_object())
+		{
+			if (UMaterial* Loaded = UMaterial::LoadMaterial(Handle["DecalMaterial"]))
+			{
+				DecalMaterial = Loaded;
+			}
+		}
+	}
+	else
+	{
+		Handle["DecalMaterial"] = DecalMaterial ? UMaterial::SaveMaterial(DecalMaterial) : json(nullptr);
+	}
+}
+
+void UDecalComponent::Serialize(FStructuredArchive::FRecord Record)
+{
+	Super::Serialize(Record);
+
+	UMaterial* Loaded = DecalMaterial;
+	UMaterial::SerializeMaterialReference(Record.EnterField("DecalMaterial"), Loaded);
+	
+	if (Record.GetUnderlyingArchive().IsLoading())
+	{
+		DecalMaterial = Loaded;
+	}
+}
+

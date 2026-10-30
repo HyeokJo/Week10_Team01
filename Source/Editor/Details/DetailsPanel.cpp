@@ -16,6 +16,7 @@
 #include "Component/SphereComponent.h"
 #include "Component/CapsuleComponent.h"
 #include "Component/ScriptComponent.h"
+#include "Component/DecalComponent.h"
 #include "Camera/CameraComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 
@@ -840,6 +841,215 @@ namespace
 		}
 	}
 
+	UMaterial* EnsureDecalMaterialInstance(UDecalComponent* Decal, UMaterial* Effective)
+	{
+		if (!Decal)
+			return nullptr;
+
+		UMaterial* Current = Decal->GetDecalMaterial();
+
+		if (Current && Current->bIsInstance)
+			return Current;
+
+		UMaterial* Source = Current ? Current : Effective;
+
+		if (!Source)
+		{
+			Source = UAssetManager::GetAssetByPath<UMaterial>("DefaultMaterial");
+		}
+
+		if (!Source)
+			return nullptr;
+
+		UMaterial* Instance = UMaterial::CreateInstance(Source);
+		Decal->SetDecalMaterial(Instance);
+		return Instance;
+	}
+
+	void DrawDecalMaterial(UDecalComponent* Decal)
+	{
+		if (!Decal)
+			return;
+
+		ImGui::PushID(Decal);
+
+		if (!ImGui::CollapsingHeader("Decal Material", ImGuiTreeNodeFlags_DefaultOpen))
+		{
+			ImGui::PopID();
+			return;
+		}
+
+		UMaterial* Current = Decal->GetDecalMaterial();
+		UMaterial* Effective = Current ? Current : UAssetManager::GetAssetByPath<UMaterial>("DefaultMaterial");
+
+		// 현재 인스턴스를 초기화하는 기능
+		if (Current)
+		{
+			ImGui::SameLine();
+			ImGui::TextDisabled("Instance");
+			ImGui::SameLine();
+
+			if (ImGui::SmallButton("Reset"))
+			{
+				Decal->SetDecalMaterial(nullptr);
+				Current = nullptr;
+				Effective = UAssetManager::GetAssetByPath<UMaterial>("DefaultMaterial");
+			}
+		}
+		else
+		{
+			ImGui::SameLine();
+			ImGui::TextDisabled("Default");
+		}
+
+		if (!Effective)
+		{
+			ImGui::TextDisabled("DefaultMaterial not found");
+			ImGui::PopID();
+			return;
+		}
+
+		constexpr float ThumbnailSize = 64.0f;
+
+		if (ImGui::BeginTable("DecalMaterialProperties", 2))
+		{
+			ImGui::TableSetupColumn("Label", ImGuiTableColumnFlags_WidthFixed, 110.0f);
+			ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
+
+			// --------------------------------------------------
+			// Texture
+			// --------------------------------------------------
+
+			ImGui::TableNextRow();
+			ImGui::TableSetColumnIndex(0);
+			ImGui::Text("Texture");
+
+			ImGui::TableSetColumnIndex(1);
+
+			UTexture2D* Texture = Effective->Textures.Num() > 0 ? Effective->Textures[0] : nullptr;
+
+			if (Texture && Texture->GetResource())
+			{
+				ImGui::Image((ImTextureID)Texture->GetResource()->GetRawSRV(), { ThumbnailSize, ThumbnailSize });
+			}
+			else
+			{
+				ImGui::Button("Empty", { ThumbnailSize, ThumbnailSize });
+			}
+
+			// 텍스처 드래그 앤 드롭
+			if (ImGui::BeginDragDropTarget())
+			{
+				if (const ImGuiPayload* Payload = ImGui::AcceptDragDropPayload(EditorDragDrop::Texture))
+				{
+					UTexture2D* DroppedTexture = *static_cast<UTexture2D**>(Payload->Data);
+
+					UMaterial* Instance = EnsureDecalMaterialInstance(Decal, Effective);
+
+					if (Instance)
+					{
+						while (Instance->Textures.Num() <= 0)
+						{
+							Instance->Textures.Add(nullptr);
+						}
+
+						Instance->Textures[0] = DroppedTexture;
+						Effective = Instance;
+						Texture = DroppedTexture;
+					}
+				}
+
+				ImGui::EndDragDropTarget();
+			}
+
+			ImGui::SameLine();
+
+			if (Texture)
+			{
+				ImGui::TextWrapped("%s", Texture->GetPath().c_str());
+
+				if (ImGui::IsItemHovered())
+				{
+					ImGui::SetTooltip("%s", Texture->GetPath().c_str());
+				}
+			}
+			else
+			{
+				ImGui::TextDisabled("(Empty)");
+			}
+
+			// --------------------------------------------------
+			// Base Color
+			// --------------------------------------------------
+
+			ImGui::TableNextRow();
+			ImGui::TableSetColumnIndex(0);
+			ImGui::Text("Base Color");
+
+			ImGui::TableSetColumnIndex(1);
+			ImGui::SetNextItemWidth(-1.0f);
+
+			FLinearColor TempColor = Effective->BaseColor;
+
+			if (ColorEditLinear("##DecalBaseColor", &TempColor.R))
+			{
+				UMaterial* Instance = EnsureDecalMaterialInstance(Decal, Effective);
+
+				if (Instance)
+				{
+					Instance->BaseColor = TempColor;
+					Effective = Instance;
+				}
+			}
+
+			// --------------------------------------------------
+			// Sampler
+			// --------------------------------------------------
+
+			ImGui::TableNextRow();
+			ImGui::TableSetColumnIndex(0);
+			ImGui::Text("Sampler");
+
+			ImGui::TableSetColumnIndex(1);
+			ImGui::SetNextItemWidth(-1.0f);
+
+			const char* SamplerItems[] =
+			{
+				"Linear Clamp",
+				"Linear Wrap",
+				"Point",
+				"Comparison Linear"
+			};
+
+			int SamplerIndex = static_cast<int>(Effective->SamplerState);
+			SamplerIndex = std::clamp(SamplerIndex, 0, IM_ARRAYSIZE(SamplerItems) - 1);
+
+			if (ImGui::BeginCombo("##DecalSampler", SamplerItems[SamplerIndex]))
+			{
+				for (int i = 0; i < IM_ARRAYSIZE(SamplerItems); ++i)
+				{
+					if (ImGui::Selectable(SamplerItems[i], SamplerIndex == i))
+					{
+						UMaterial* Instance =
+							EnsureDecalMaterialInstance(Decal, Effective);
+
+						if (Instance)
+						{
+							Instance->SamplerState = static_cast<ESamplerState>(i);
+							Effective = Instance;
+						}
+					}
+				}
+
+				ImGui::EndCombo();
+			}
+
+			ImGui::EndTable();
+		}
+
+		ImGui::PopID();
+	}
+
 	// UClass에 등록된 프로퍼티를 타입에 맞는 위젯으로 그린다
 	void DrawProperty(UObject* Object, const FProperty& Property, ImFont* CustomFont, float LabelWidth)
 	{
@@ -1322,6 +1532,10 @@ void FDetailsPanel::OnRender()
 			if (UMeshComponent* MeshComponent = Cast<UMeshComponent>(TargetComponent))
 			{
 				DrawMaterialSlots(MeshComponent);
+			}
+			if (UDecalComponent* DecalComponent = Cast<UDecalComponent>(TargetComponent))
+			{
+				DrawDecalMaterial(DecalComponent);
 			}
 			if (ULightComponent* Light = Cast<ULightComponent>(TargetComponent))
 			{
