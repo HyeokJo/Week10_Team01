@@ -50,7 +50,8 @@ namespace
 		if (Packet.Material->BlendState != EBlendState::Opaque)
 		{
 			const uint32 DistanceBits = std::bit_cast<uint32>(Packet.CameraToParticleDistance);
-			return (1ull << 63) | static_cast<uint64>(~DistanceBits);
+			const uint32 InvDistanceBits = ~DistanceBits;   // 하위 32비트만 반전. 먼 것이 먼저 그려진다
+			return (1ull << 63) | static_cast<uint64>(InvDistanceBits);
 		}
 
 		return (static_cast<uint64>(Packet.Material->SortID) << 47)
@@ -234,7 +235,7 @@ void FRenderer::RenderQueueSorting(FRenderQueue& InQueue, const FMatrix& ViewPro
 		// ① 패킷을 한 번 훑으며 키를 만든다. 그릴 수 없는 패킷은 목록에 넣지 않는다.
 		SortEntries.Reset();
 		SortEntries.Reserve(RenderPackets.Num());
-		for (uint32 i = 0; i < RenderPackets.Num(); ++i)
+		for (uint32 i = 0; i < static_cast<uint32>(RenderPackets.Num()); ++i)
 		{
 			const FRenderPacket& P = RenderPackets[i];
 			if (!P.Mesh || !P.Material) continue;
@@ -247,7 +248,7 @@ void FRenderer::RenderQueueSorting(FRenderQueue& InQueue, const FMatrix& ViewPro
 
 		// ③ 반투명 시작 위치 = 최상위 비트가 처음 1인 곳
 		FirstTranslucentIndex = 0;
-		while (FirstTranslucentIndex < SortEntries.Num() && !(SortEntries[FirstTranslucentIndex].Key >> 63))
+		while (FirstTranslucentIndex < static_cast<uint32>(SortEntries.Num()) && !(SortEntries[FirstTranslucentIndex].Key >> 63))
 			++FirstTranslucentIndex;
 
 		// ④ 스태틱 메시 묶음: 빈 묶음을 빼고 키 순으로 정렬한다. 조각마다 같은 키 묶음이 있으므로 정렬하면 서로 붙는다.
@@ -366,7 +367,7 @@ FOcclusionMeasureResult FRenderer::MeasureOpaqueOcclusion(const FMatrix& ViewPro
 			return Result;
 	}
 
-	while (OcclusionQueries.Num() < Count)
+	while (static_cast<uint32>(OcclusionQueries.Num()) < Count)
 	{
 		const D3D11_QUERY_DESC QueryDesc{ D3D11_QUERY_OCCLUSION, 0 };
 		ComPtr<ID3D11Query> Query;

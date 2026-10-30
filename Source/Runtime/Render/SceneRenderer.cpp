@@ -266,7 +266,7 @@ void FSceneRenderer::RenderGammaEncodePass(const FRenderingInfo& SceneInfo, cons
 
 	RenderCommand::BeginRenderPass(PassInfo);
 	GammaEncodeRenderer->OnRender(SceneColor, bEncode, bToneMap, ExposureEV, bLetterbox, TargetAspect, InDamageIntensity,
-		ViewInfo.ViewportSetting.Width, ViewInfo.ViewportSetting.Height, ScreenEffect);
+		static_cast<float>(ViewInfo.ViewportSetting.Width), static_cast<float>(ViewInfo.ViewportSetting.Height), ScreenEffect);
 
 	RenderCommand::EndRenderPass();
 

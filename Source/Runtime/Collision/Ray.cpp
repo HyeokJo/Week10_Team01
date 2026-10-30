@@ -153,7 +153,7 @@ bool RayIntersectsMesh(const FRay& LocalRay, const FStaticMeshData& Mesh, float&
     }
     else
     {
-        for (uint32 i = 0; i + 2 < Mesh.Indices.Num(); i += 3)
+        for (uint32 i = 0; i + 2 < static_cast<uint32>(Mesh.Indices.Num()); i += 3)
         {
             FVector vertices[3]{};	// 3 vertex
             for (uint32 j = 0; j < 3; ++j)

@@ -286,7 +286,7 @@ void UWorld::GatherRenderPackets(FRenderQueue& RenderQueue, const FLODViewContex
 			if (Occlusion.GetSettings().bCull)
 			{
 				uint32 Kept = 0;
-				for (uint32 i = 0; i < VisibleProxies.Num(); ++i)
+				for (uint32 i = 0; i < static_cast<uint32>(VisibleProxies.Num()); ++i)
 					if (!Occluded[i])
 						VisibleProxies[Kept++] = VisibleProxies[i];
 				VisibleProxies.SetNum(Kept);
@@ -310,10 +310,10 @@ void UWorld::GatherRenderPackets(FRenderQueue& RenderQueue, const FLODViewContex
 	FTaskPool& Pool = FTaskPool::Get();
 	const uint32 ChunkCount = FMath::Clamp(VisibleCount, 1u, Pool.GetNumThreads() * 4);
 
-	if (GatherChunks.Num() < ChunkCount)
+	if (static_cast<uint32>(GatherChunks.Num()) < ChunkCount)
 		GatherChunks.SetNum(ChunkCount);     // 늘릴 때만. 줄이지 않아야 배열 용량이 계속 재사용된다.
 
-	for (uint32 c = 0; c < GatherChunks.Num(); ++c)   // 이번에 안 쓰는 조각의 묶음도 비워 둔다 (Renderer에 넘기지 않도록)
+	for (uint32 c = 0; c < static_cast<uint32>(GatherChunks.Num()); ++c)   // 이번에 안 쓰는 조각의 묶음도 비워 둔다 (Renderer에 넘기지 않도록)
 	{
 		FGatherChunk& Chunk = GatherChunks[c];
 		Chunk.Packets.Reset();               // 용량은 유지, 개수만 0
@@ -472,7 +472,7 @@ void UWorld::GatherRenderPackets(FRenderQueue& RenderQueue, const FLODViewContex
 				}
 
 				// continue 없이 항상 여기까지 와서 새 패킷에 여유 칸을 배정한다.
-				for (uint32 p = FirstNew; p < RenderQueue.Num(); ++p)
+				for (uint32 p = FirstNew; p < static_cast<uint32>(RenderQueue.Num()); ++p)
 				{
 					if (!SlotDest || NextExtraSlot >= MaxSlots) break;
 					FRenderPacket& Packet = RenderQueue[p];

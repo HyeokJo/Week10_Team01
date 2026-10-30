@@ -76,7 +76,7 @@ void USceneComponent::DetachFromParent(EAttachmentRule Rule)
 	{
 		FMatrix WorldMatrix = GetWorldMatrix();
 		TArray<USceneComponent*>& Siblings = AttachParent->AttachChildren;
-		for (uint32 i = 0;i < Siblings.Num(); ++i)
+		for (uint32 i = 0;i < static_cast<uint32>(Siblings.Num()); ++i)
 		{
 			if (Siblings[i] == this)
 			{
@@ -90,7 +90,7 @@ void USceneComponent::DetachFromParent(EAttachmentRule Rule)
 	else
 	{
 		TArray<USceneComponent*>& Siblings = AttachParent->AttachChildren;
-		for (uint32 i = 0;i < Siblings.Num(); ++i)
+		for (uint32 i = 0;i < static_cast<uint32>(Siblings.Num()); ++i)
 		{
 			if (Siblings[i] == this)
 			{

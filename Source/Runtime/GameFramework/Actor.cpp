@@ -279,7 +279,7 @@ void AActor::Serialize(FStructuredArchive::FRecord Record)
 
 void AActor::RemoveOwnedComponent(UActorComponent* Component)
 {
-	for (uint32 i = 0; i < Components.Num(); ++i)
+	for (uint32 i = 0; i < static_cast<uint32>(Components.Num()); ++i)
 	{
 		if (Components[i] == Component)
 		{

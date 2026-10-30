@@ -125,7 +125,7 @@ void FLineBatcher::AddPath(const TArray<FVector>& Points, const FVector4& Color)
 	{
 		return;
 	}
-	for (size_t i = 0; i < Points.size() - 1; ++i) {
+	for (uint32 i = 0; i + 1 < static_cast<uint32>(Points.Num()); ++i) {
 		AddLine(Points[i], Points[i + 1], Color);
 	}
 }
