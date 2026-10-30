@@ -83,7 +83,12 @@ public:
 		bReceiveShadow = bInReceiveShadow;
 		MarkRenderStateDirty();
 	}
-
+	bool IsReceiveDecal() const { return bReceiveDecal; }
+	void SetReceiveDecal(bool bInReceiveDecal)
+	{
+		bReceiveDecal = bInReceiveDecal;
+		MarkRenderStateDirty();
+	}
 	virtual void SetHiddenInGame(bool bInHidden) override
 	{
 		Super::SetHiddenInGame(bInHidden);

@@ -230,8 +230,8 @@ void FRenderDevice::CreateStates()
 
 		// 깊이 없이 선택 메시 영역의 스텐실을 올린다 (참조값 0 기준).
 		Desc.StencilEnable = TRUE;
-		Desc.StencilReadMask = D3D11_DEFAULT_STENCIL_READ_MASK;
-		Desc.StencilWriteMask = D3D11_DEFAULT_STENCIL_WRITE_MASK;
+		Desc.StencilReadMask = 0x01;
+		Desc.StencilWriteMask = 0x01;
 		Desc.FrontFace.StencilFailOp = D3D11_STENCIL_OP_KEEP;
 		Desc.FrontFace.StencilDepthFailOp = D3D11_STENCIL_OP_KEEP;
 		Desc.FrontFace.StencilPassOp = D3D11_STENCIL_OP_INCR_SAT;
@@ -245,6 +245,23 @@ void FRenderDevice::CreateStates()
 		Desc.FrontFace.StencilFunc = D3D11_COMPARISON_EQUAL;
 		Desc.BackFace = Desc.FrontFace;
 		Device->CreateDepthStencilState(&Desc, DepthStencilStates[(uint8)EDepthStencilState::StencilOutline].GetAddressOf());
+
+		// Opaque 메시가 실제 Depth를 통과할 때 Receive Decal 여부를 기록한다.
+		D3D11_DEPTH_STENCIL_DESC DecalReceiverDesc{};
+
+		DecalReceiverDesc.DepthEnable = TRUE;
+		DecalReceiverDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
+		DecalReceiverDesc.DepthFunc = D3D11_COMPARISON_LESS;
+		DecalReceiverDesc.StencilEnable = TRUE;
+		DecalReceiverDesc.StencilReadMask = 0x80;
+		DecalReceiverDesc.StencilWriteMask = 0x80;
+		DecalReceiverDesc.FrontFace.StencilFailOp = D3D11_STENCIL_OP_KEEP;
+		DecalReceiverDesc.FrontFace.StencilDepthFailOp = D3D11_STENCIL_OP_KEEP;
+		DecalReceiverDesc.FrontFace.StencilPassOp = D3D11_STENCIL_OP_REPLACE;
+		DecalReceiverDesc.FrontFace.StencilFunc = D3D11_COMPARISON_ALWAYS;
+		DecalReceiverDesc.BackFace = DecalReceiverDesc.FrontFace;
+
+		Device->CreateDepthStencilState(&DecalReceiverDesc, DepthStencilStates[(uint8)EDepthStencilState::DecalReceiverMask].GetAddressOf());
 	}
 
 	// ---------- Blend ----------

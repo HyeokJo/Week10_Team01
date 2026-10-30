@@ -211,6 +211,15 @@ void RenderCommand::BindShaderResource(uint32 Slot, UTexture2D* Texture2D, EShad
 	BindShaderResource(Slot, TextureResource, FlagBits, bRawData);
 }
 
+void RenderCommand::BindStencilShaderResource(uint32 Slot, FTexture2D* Texture2D, EShaderBindFlagBits FlagBits)
+{
+	ID3D11ShaderResourceView* SRV = Texture2D ? Texture2D->GetStencilSRV() : nullptr;
+	if (HasFlag(FlagBits, EShaderBindFlagBits::Pixel))
+	{
+		RenderDevice->GetContext()->PSSetShaderResources(Slot, 1, &SRV);
+	}
+}
+
 void RenderCommand::UnbindShaderResource(uint32 Slot, EShaderBindFlagBits FlagBits)
 {
 	ID3D11ShaderResourceView* NullSRV = nullptr;
@@ -305,9 +314,9 @@ void RenderCommand::SetBlendState(EBlendState State)
 	RenderDevice->GetContext()->OMSetBlendState(RenderDevice->GetBlendState(State), nullptr, 0xffffffff);
 }
 
-void RenderCommand::SetDepthStencilState(EDepthStencilState State)
+void RenderCommand::SetDepthStencilState(EDepthStencilState State, uint32 StencilRef)
 {
-	RenderDevice->GetContext()->OMSetDepthStencilState(RenderDevice->GetDepthStencilState(State), 0);
+	RenderDevice->GetContext()->OMSetDepthStencilState(RenderDevice->GetDepthStencilState(State), StencilRef);
 }
 
 void RenderCommand::BindSamplerState(uint32 Slot, ESamplerState SamplerState, EShaderBindFlagBits FlagBits)

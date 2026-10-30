@@ -35,6 +35,7 @@ struct FSceneRenderSettings
 {
 	bool bDrawPrimitives = true;
 	bool bDrawShadows = true;
+	bool bDrawDecals = true;
 	FShadowFilterSettings ShadowFilter;
 	bool bExponentialHeightFog = true;
 	bool bToneMapping = true;

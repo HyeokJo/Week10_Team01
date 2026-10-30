@@ -150,6 +150,7 @@ void FRenderer::RenderOpaque(const FMatrix& ViewProjection)
 {
 	DrawStaticGroups();
 	DrawPackets(0, FirstTranslucentIndex, ViewProjection);
+	RenderCommand::SetDepthStencilState(EDepthStencilState::Default);
 }
 
 // RenderOpaque가 남긴 반투명 패킷을 먼 것부터 그린다.
@@ -210,6 +211,13 @@ void FRenderer::DrawStaticGroups()
 				RenderCommand::BindConstantBuffer(2, PerObjectCB.get(), EShaderBindFlagBits::Vertex);
 				UpdatePerObjectConstants(Item.Proxy->GetLocalToWorld(), Item.Proxy->GetNormalMatrix());
 			}
+
+			if (Group->Material->BlendState == EBlendState::Opaque && Group->Material->DepthStencilState == EDepthStencilState::Default)
+			{
+				const bool bReceiveDecal = Item.Proxy ? Item.Proxy->IsReceiveDecal() : true;
+				RenderCommand::SetDepthStencilState(EDepthStencilState::DecalReceiverMask, bReceiveDecal ? 0x80 : 0x00);
+			}
+
 			RenderCommand::DrawIndexed(Item.IndexCount, Item.StartIndex);
 		}
 	}
@@ -299,6 +307,13 @@ void FRenderer::DrawPackets(uint32 Begin, uint32 End, const FMatrix& ViewProject
 		{
 			RenderCommand::BindConstantBuffer(2, PerObjectCB.get(), EShaderBindFlagBits::Vertex);
 			UpdatePerObjectConstants(RenderPacket, ViewProjection);
+		}
+
+		if (RenderPacket.Material->BlendState == EBlendState::Opaque && RenderPacket.Material->DepthStencilState == EDepthStencilState::Default)
+		{
+			const bool bReceiveDecal = RenderPacket.Proxy ? RenderPacket.Proxy->IsReceiveDecal() : true;
+
+			RenderCommand::SetDepthStencilState(EDepthStencilState::DecalReceiverMask, bReceiveDecal ? 0x80 : 0x00);
 		}
 
 		RenderCommand::DrawIndexed(

@@ -614,6 +614,7 @@ FSceneRenderSettings UEditorEngine::MakeSceneRenderSettings() const
 	return {
 		.bDrawPrimitives = Settings.bDrawPrimitives,
 		.bDrawShadows = Settings.bDrawShadows,
+		.bDrawDecals = Settings.bDrawDecals,
 		.ShadowFilter = Filter,
 		.bExponentialHeightFog = Settings.bExponentialHeightFog,
 		.bToneMapping = Settings.bToneMapping,

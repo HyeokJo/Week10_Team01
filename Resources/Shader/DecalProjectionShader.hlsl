@@ -2,7 +2,7 @@
 
 Texture2D<float> SceneDepth : register(t0);
 Texture2D<float4> DecalTexture : register(t1);
-
+Texture2D<uint2> DecalReceiverMask : register(t2);
 SamplerState DecalSampler : register(s0);
 
 cbuffer DecalConstants : register(b0)
@@ -36,7 +36,12 @@ float4 mainPS(PSInput Input) : SV_TARGET
 
     if (Depth >= 1.0f)
         discard;
+    
+    uint ReceiverStencil = DecalReceiverMask.Load(int3(Input.Position.xy, 0)).g;
 
+    if ((ReceiverStencil & 0x80u) == 0u)
+        discard;
+    
     float2 NDC = Input.UV * float2(2.0f, -2.0f) + float2(-1.0f, 1.0f);
 
     float4 WorldPosition = mul(float4(NDC, Depth, 1.0f), InverseViewProjection);

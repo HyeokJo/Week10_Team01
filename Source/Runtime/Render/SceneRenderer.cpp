@@ -126,7 +126,7 @@ void FSceneRenderer::Render(UWorld& World, const FSceneView& SceneView, const FS
 	const EViewMode ViewMode = SceneView.RenderMode.ViewMode;
 	const bool bVisualizeData = IsDataVisualization(ViewMode);
 
-	if (!Settings.bDepthView && !bVisualizeData)
+	if (Settings.bDrawDecals && !Settings.bDepthView && !bVisualizeData)
 	{
 		RenderDecalPass(SceneView, Settings, World, SceneInfo, FrustumPlanes);
 	}
@@ -374,6 +374,7 @@ void FSceneRenderer::RenderDecalPass(const FSceneView& SceneView, const FSceneRe
 
 	RenderCommand::UnbindShaderResource(0, EShaderBindFlagBits::Pixel);
 	RenderCommand::UnbindShaderResource(1, EShaderBindFlagBits::Pixel);
+	RenderCommand::UnbindShaderResource(2, EShaderBindFlagBits::Pixel);
 }
 
 void FSceneRenderer::RenderTranslucentPass(const FSceneView& SceneView, const FSceneRenderSettings& Settings, const UWorld& ViewWorld, const FRenderingInfo& SceneInfo)
