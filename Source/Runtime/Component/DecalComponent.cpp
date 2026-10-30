@@ -30,11 +30,15 @@ void UDecalComponent::Serialize(json& Handle, bool bIsLoading)
 	Super::Serialize(Handle, bIsLoading);
 	if (bIsLoading)
 	{
-		if (Handle.contains("DecalMaterial") && Handle["DecalMaterial"].is_object())
+		if (Handle.contains("DecalMaterial"))
 		{
-			if (UMaterial* Loaded = UMaterial::LoadMaterial(Handle["DecalMaterial"]))
+			if (Handle["DecalMaterial"].is_null())
 			{
-				DecalMaterial = Loaded;
+				DecalMaterial = nullptr;
+			}
+			else if (Handle["DecalMaterial"].is_object())
+			{
+				DecalMaterial = UMaterial::LoadMaterial(Handle["DecalMaterial"]);
 			}
 		}
 	}

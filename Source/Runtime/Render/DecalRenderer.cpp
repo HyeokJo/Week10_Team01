@@ -34,7 +34,11 @@ bool FDecalRenderer::Init()
 void FDecalRenderer::OnRender(FTexture2D* DepthTexture, const FMatrix& ViewProjection, const UDecalComponent& Decal)
 {
     UMaterial* Material = Decal.GetDecalMaterial();
-    if (!DepthTexture || !Material || Material->Textures.Num() <= 0 || !Material->Textures[0])
+    if (!Material)
+    {
+        Material = UAssetManager::GetAssetByPath<UMaterial>("DefaultMaterial");
+    }
+    if (!DepthTexture || Material->Textures.Num() <= 0 || !Material->Textures[0])
     {
         return;
     }
@@ -54,7 +58,7 @@ void FDecalRenderer::OnRender(FTexture2D* DepthTexture, const FMatrix& ViewProje
     RenderCommand::BindPipelineState(PipelineState);
     RenderCommand::BindShaderResource(0, DepthTexture, EShaderBindFlagBits::Pixel);
     RenderCommand::BindShaderResource(1, DecalTexture, EShaderBindFlagBits::Pixel);
-    RenderCommand::BindSamplerState(0, ESamplerState::LinearClamp, EShaderBindFlagBits::Pixel);
+    RenderCommand::BindSamplerState(0, Material->SamplerState, EShaderBindFlagBits::Pixel);
     RenderCommand::UpdateBufferData(ConstantBuffer.get(), &Constants);
     RenderCommand::BindConstantBuffer(0, ConstantBuffer.get(), EShaderBindFlagBits::Pixel);
     RenderCommand::Draw(3);

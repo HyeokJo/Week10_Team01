@@ -55,7 +55,7 @@ float4 mainPS(PSInput Input) : SV_TARGET
 
     float4 Color = DecalTexture.Sample(DecalSampler, DecalUV);
     Color.rgb *= BaseColor.rgb;
-    Color.a *= saturate(Opacity);
+    Color.a *= saturate(Opacity) * saturate(BaseColor.a);
 
     if (Color.a <= 0.001f)
         discard;
