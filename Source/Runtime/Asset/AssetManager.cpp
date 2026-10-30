@@ -10,6 +10,7 @@
 #include "Render/RenderResourceManager.h"
 
 #include "Asset/ObjImporter/ObjImporter.h"
+#include "Asset/FbxImporter/FbxImporter.h"
 
 #include "Render/GeometryGenerator.h"
 #include "UObject/UObjectGlobals.h"
@@ -202,7 +203,7 @@ void UAssetManager::LoadAsset(const FString& Key, const FString& Path)
 	}
 	if (Extension == ".fbx")
 	{
-
+		FFbxImporter::DebugPrintScene(Path);
 	}
 }
 

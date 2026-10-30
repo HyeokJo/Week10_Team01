@@ -5,6 +5,11 @@
 #include "Math/Box.h"
 #include "Math/Color.h"
 
+struct FSkeletalMeshData
+{
+
+};
+
 //// Cooked obj Data의 Section 구조체
 //struct FStaticMeshSection
 //{

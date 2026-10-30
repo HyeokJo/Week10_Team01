@@ -5,12 +5,15 @@
 #include "Core/Types.h"
 #include "Core/EngineString.h"
 
-//struct FStaticMeshData;
+struct FSkeletalMeshData;
 
 class FFbxImporter
 {
 public:
-//	static TUniquePtr<FStaticMeshData> LoadStaticMeshData(const FString& Path);
+	//테스트용
+	static bool DebugPrintScene(const FString& Path);
+
+	static TUniquePtr<FSkeletalMeshData> LoadStaticMeshData(const FString& Path);
 //
 //	// 디버그용 출력
 //	static void PrintObjInfo(const FObjInfo& ObjInfo);
