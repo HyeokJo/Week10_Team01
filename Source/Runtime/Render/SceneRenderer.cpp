@@ -19,7 +19,7 @@
 #include "UObject/UObjectIterator.h"
 #include "DecalRenderer.h"
 #include "Component/DecalComponent.h"
-
+#include "Core/StatOverlay.h"
 FSceneRenderer::FSceneRenderer() = default;
 
 FSceneRenderer::~FSceneRenderer() = default;
@@ -118,6 +118,10 @@ void FSceneRenderer::Render(UWorld& World, const FSceneView& SceneView, const FS
 	Renderer->BindShadowForShading();
 
 	FStatOverlay::SetShadowStats(ShadowStats);
+
+	FDecalStats DecalStats{};
+	DecalStats.NumTotalDecals = World.GetScene().GetDecalComponents().Num();
+	FStatOverlay::SetDecalStats(DecalStats);
 
 	// 1. 불투명·반투명 Pass (Linear 씬 컬러)
 	RenderOpaquePass(SceneView, Settings, World, SceneInfo, RenderQueue, Lighting.Directional);
@@ -326,13 +330,14 @@ void FSceneRenderer::RenderDepthPass(const FSceneView& SceneView, const FRenderi
 
 void FSceneRenderer::RenderDecalPass(const FSceneView& SceneView, const FSceneRenderSettings& Settings, const UWorld& ViewWorld, const FRenderingInfo& SceneInfo, const FFrustumPlanes& FrustumPlanes)
 {
-	if (!Settings.bDrawPrimitives)
-	{
-		return;
-	}
+	FDecalStats DecalStats{};
+
 	const TArray<UDecalComponent*>& Decals = ViewWorld.GetScene().GetDecalComponents();
-	if (Decals.IsEmpty())
+	DecalStats.NumTotalDecals = Decals.Num();
+
+	if (!Settings.bDrawPrimitives || Decals.IsEmpty())
 	{
+		FStatOverlay::SetDecalStats(DecalStats);
 		return;
 	}
 
@@ -356,6 +361,7 @@ void FSceneRenderer::RenderDecalPass(const FSceneView& SceneView, const FSceneRe
 
 		if (ViewWorld.GetWorldType() != EWorldType::Editor && Decal->IsHiddenInGame())
 		{
+			++DecalStats.NumHiddenDecals;
 			continue;
 		}
 
@@ -364,10 +370,16 @@ void FSceneRenderer::RenderDecalPass(const FSceneView& SceneView, const FSceneRe
 
 		if (!IsAABBInFrustum(WorldBounds, FrustumPlanes))
 		{
+			++DecalStats.NumFrustumCulledDecals;
 			continue;
 		}
 
-		DecalRenderer->OnRender(SceneInfo.DepthStencil.Texture, SceneView.ViewProjection, *Decal);
+		++DecalStats.NumInFrustumDecals;
+
+		if (DecalRenderer->OnRender(SceneInfo.DepthStencil.Texture, SceneView.ViewProjection, *Decal))
+		{
+			++DecalStats.NumDrawCalls;
+		}
 	}
 
 	RenderCommand::EndRenderPass();
@@ -375,6 +387,7 @@ void FSceneRenderer::RenderDecalPass(const FSceneView& SceneView, const FSceneRe
 	RenderCommand::UnbindShaderResource(0, EShaderBindFlagBits::Pixel);
 	RenderCommand::UnbindShaderResource(1, EShaderBindFlagBits::Pixel);
 	RenderCommand::UnbindShaderResource(2, EShaderBindFlagBits::Pixel);
+	FStatOverlay::SetDecalStats(DecalStats);
 }
 
 void FSceneRenderer::RenderTranslucentPass(const FSceneView& SceneView, const FSceneRenderSettings& Settings, const UWorld& ViewWorld, const FRenderingInfo& SceneInfo)

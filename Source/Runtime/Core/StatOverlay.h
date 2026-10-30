@@ -11,6 +11,7 @@ enum class EStatFlags : uint32
 	Memory  = 1 << 1,
 	Profile = 1 << 2,
 	Shadow = 1 << 3,
+	Decal = 1 << 4
 };
 
 struct FShadowStats {
@@ -23,6 +24,15 @@ struct FShadowStats {
 	int32 NumSkippedCasterDraws = 0;	// 생략된 Caster 그리기 횟수
 	int32 NumCachedShadowMaps = 0;
 	int64 ShadowMapMemoryBytes = 0;
+};
+
+struct FDecalStats
+{
+	int32 NumTotalDecals = 0;
+	int32 NumHiddenDecals = 0;
+	int32 NumFrustumCulledDecals = 0;
+	int32 NumInFrustumDecals = 0;
+	int32 NumDrawCalls = 0;
 };
 
 DEFINE_ENUM_OPERATORS(EStatFlags)
@@ -56,6 +66,8 @@ public:
 	static void SetShadowStats(const FShadowStats& inShadowStats) { ShadowStats = inShadowStats; }
 	static const FShadowStats & GetShadowStats() { return ShadowStats; }
 
+	static void SetDecalStats(const FDecalStats& InDecalStats) { DecalStats = InDecalStats; }
+	static const FDecalStats& GetDecalStats() { return DecalStats; }
 private:
 	// 표시 수치 갱신 주기(초). 너무 짧으면 숫자가 읽히지 않는다.
 	static constexpr float SampleInterval = 0.25f;
@@ -66,4 +78,5 @@ private:
 	inline static float DisplayFPS = 0.0f;
 	inline static float DisplayFrameTimeMs = 0.0f;
 	inline static FShadowStats ShadowStats;
+	inline static FDecalStats DecalStats;
 };

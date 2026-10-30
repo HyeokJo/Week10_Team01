@@ -31,7 +31,7 @@ bool FDecalRenderer::Init()
     return true;
 }
 
-void FDecalRenderer::OnRender(FTexture2D* DepthTexture, const FMatrix& ViewProjection, const UDecalComponent& Decal)
+bool FDecalRenderer::OnRender(FTexture2D* DepthTexture, const FMatrix& ViewProjection, const UDecalComponent& Decal)
 {
     UMaterial* Material = Decal.GetDecalMaterial();
     if (!Material)
@@ -40,13 +40,9 @@ void FDecalRenderer::OnRender(FTexture2D* DepthTexture, const FMatrix& ViewProje
     }
     if (!DepthTexture || !DepthTexture->GetStencilSRV() ||  Material->Textures.Num() <= 0 || !Material->Textures[0])
     {
-        return;
+        return false;
     }
     UTexture2D* DecalTexture = Material->Textures[0];
-    if (!DecalTexture)
-    {
-        return;
-    }
 
     FDecalConstants Constants{};
     Constants.InverseViewProjection = ViewProjection.Inverse();
@@ -64,4 +60,5 @@ void FDecalRenderer::OnRender(FTexture2D* DepthTexture, const FMatrix& ViewProje
     RenderCommand::BindConstantBuffer(0, ConstantBuffer.get(), EShaderBindFlagBits::Pixel);
     RenderCommand::Draw(3);
 
+    return true;
 }

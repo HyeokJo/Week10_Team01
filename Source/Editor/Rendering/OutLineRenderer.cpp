@@ -85,6 +85,10 @@ void FOutlineRenderer::DrawTarget(const UPrimitiveComponent* Target, const FPipe
 
 	RenderCommand::BindMesh(TargetMesh);
 	RenderCommand::BindPipelineState(PipelineState);
+	if (PipelineState.DepthStencilState == EDepthStencilState::StencilMask)
+	{
+		RenderCommand::SetDepthStencilState(EDepthStencilState::StencilMask, 0x01);
+	}
 	RenderCommand::UpdateBufferData(ConstantBuffer.get(), &Constants, sizeof(Constants));
 	RenderCommand::DrawIndexed(TargetMesh->IndexBuffer->GetIndexCount());
 }

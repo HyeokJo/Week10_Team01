@@ -234,7 +234,7 @@ void FRenderDevice::CreateStates()
 		Desc.StencilWriteMask = 0x01;
 		Desc.FrontFace.StencilFailOp = D3D11_STENCIL_OP_KEEP;
 		Desc.FrontFace.StencilDepthFailOp = D3D11_STENCIL_OP_KEEP;
-		Desc.FrontFace.StencilPassOp = D3D11_STENCIL_OP_INCR_SAT;
+		Desc.FrontFace.StencilPassOp = D3D11_STENCIL_OP_REPLACE;
 		Desc.FrontFace.StencilFunc = D3D11_COMPARISON_ALWAYS;
 		Desc.BackFace = Desc.FrontFace;
 		Device->CreateDepthStencilState(&Desc, DepthStencilStates[(uint8)EDepthStencilState::StencilMask].GetAddressOf());

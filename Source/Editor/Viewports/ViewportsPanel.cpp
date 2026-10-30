@@ -579,6 +579,16 @@ void FViewportsPanel::DrawStatOverlay(ImDrawList* DrawList, const ImVec2& ViewMi
 		Lines.Add({ std::format("  Memory         {:.2f} MB",
 			static_cast<int64>(shadow.ShadowMapMemoryBytes) / BytesPerMegabyte), ValueColor });
 	}
+	if (FStatOverlay::IsEnabled(EStatFlags::Decal))
+	{
+		Lines.Add({ "Decal", TitleColor });
+		const FDecalStats& Decal = FStatOverlay::GetDecalStats();
+		Lines.Add({std::format("  Total          {}", Decal.NumTotalDecals), ValueColor});
+		Lines.Add({std::format("  Hidden         {}", Decal.NumHiddenDecals), ValueColor});
+		Lines.Add({std::format("  Frustum Culled {}", Decal.NumFrustumCulledDecals), ValueColor});
+		Lines.Add({std::format("  In Frustum     {}", Decal.NumInFrustumDecals), ValueColor});
+		Lines.Add({std::format("  Draw Calls     {}", Decal.NumDrawCalls), ValueColor});
+	}
 
 	struct FProfileStatLine
 	{
