@@ -14,6 +14,8 @@ namespace fbxsdk
 	class FbxImporter;
 	class FbxIOSettings;
 	class FbxScene;
+	class FbxGlobalSettings;
+	class FbxNode;
 }
 
 class FFbxImporter
@@ -35,6 +37,16 @@ public:
 	static bool CreateScene(fbxsdk::FbxManager* InManager, fbxsdk::FbxScene*& InScene);
 
 	static bool ImportFbx(fbxsdk::FbxImporter* InImporter, fbxsdk::FbxScene* InScene);
+
+	static bool DisplayScene(fbxsdk::FbxScene* InScene);
+	static void DisplayMetaData(fbxsdk::FbxScene* InScene);
+	static void DisplayLightSettings(fbxsdk::FbxGlobalSettings* InSettings);
+	static void DisplayTimeSettings(fbxsdk::FbxGlobalSettings* InSettings);
+	static void DisplayHierarchy(fbxsdk::FbxScene* InScene);
+	static void DisplayHierarchy(fbxsdk::FbxNode* pNode, int pDepth);
+	static void DisplayContent(fbxsdk::FbxScene* pScene);
+	static void DisplayContent(fbxsdk::FbxNode* pNode);
+
 //
 //	// 디버그용 출력
 //	static void PrintObjInfo(const FObjInfo& ObjInfo);

@@ -3,7 +3,7 @@
 
 //아래 define은 안 붙여줘도 되지만 fbxsdk 클래스를 들어갔다가 나오면 모호하다고 빨간 줄 뜬다.
 //아래 define을 0으로 바꿨다가 1로 다시 바꾸면 모호해지지 않는다.(1로 두도록 하자. 0이면 안된다)
-//#define FBXSDK_NAMESPACE_USING 1
+#define FBXSDK_NAMESPACE_USING 1
 #include <fbxsdk.h>
 
 #include "Render/SkeletalMeshData.h"
@@ -54,12 +54,22 @@ bool FFbxImporter::DebugPrintScene(const FString& Path)
 	}
 		
 	//Display Scene
-
+	if (!DisplayScene(Scene))
+	{
+		return false;
+	}
 
 	//Destroy
-	Importer->Destroy();
-	Manager->Destroy();
-	return false;
+	if (Importer)
+	{
+		Importer->Destroy();
+	}
+	if (Manager)
+	{
+		Manager->Destroy();
+	}
+
+	return true;
 }
 
 TUniquePtr<FSkeletalMeshData> FFbxImporter::LoadStaticMeshData(const FString& Path)
@@ -233,4 +243,155 @@ bool FFbxImporter::ImportFbx(fbxsdk::FbxImporter* InImporter, fbxsdk::FbxScene* 
 	}
 
 	return bResult;
+}
+
+bool FFbxImporter::DisplayScene(fbxsdk::FbxScene* InScene)
+{
+	//MetaData
+	DisplayMetaData(InScene);
+
+	FbxGlobalSettings& GSetting = InScene->GetGlobalSettings();
+
+	//Light Color
+	DisplayLightSettings(&GSetting);
+
+	//Camera
+	HTR_LOG(Info, "Default Camera : {}", GSetting.GetDefaultCamera().Buffer());
+
+	//Global Time Setting
+	DisplayTimeSettings(&GSetting);
+
+	//Hierarchy
+	DisplayHierarchy(InScene);
+
+	return true;
+}
+
+void FFbxImporter::DisplayMetaData(fbxsdk::FbxScene* InScene)
+{
+	FbxDocumentInfo* sceneInfo = InScene->GetSceneInfo();
+
+	if (sceneInfo)
+	{
+		HTR_LOG(Info, "--------------------Meta-Data--------------------");
+		HTR_LOG(Info, "    Title: {}", sceneInfo->mTitle.Buffer());
+		HTR_LOG(Info, "    Subject: {}", sceneInfo->mSubject.Buffer());
+		HTR_LOG(Info, "    Author: {}", sceneInfo->mAuthor.Buffer());
+		HTR_LOG(Info, "    Keywords: {}", sceneInfo->mKeywords.Buffer());
+		HTR_LOG(Info, "    Revision: {}", sceneInfo->mRevision.Buffer());
+		HTR_LOG(Info, "    Comment: {}", sceneInfo->mComment.Buffer());
+		HTR_LOG(Info, "--------------------Meta-Data--------------------");
+
+		FbxThumbnail* thumbnail = sceneInfo->GetSceneThumbnail();
+		if (thumbnail)
+		{
+			HTR_LOG(Info, "    Thumbnail:");
+
+			switch (thumbnail->GetDataFormat())
+			{
+				case FbxThumbnail::eRGB_24:
+					HTR_LOG(Info, "        Format: RGB");
+					break;
+				case FbxThumbnail::eRGBA_32:
+					HTR_LOG(Info, "        Format: RGBA");
+					break;
+			}
+
+			switch (thumbnail->GetSize())
+			{
+				default:
+					break;
+				case FbxThumbnail::eNotSet:
+					HTR_LOG(Info, "        Size: no dimensions specified ({} bytes)", thumbnail->GetSizeInBytes());
+					break;
+				case FbxThumbnail::e64x64:
+					HTR_LOG(Info, "        Size: 64 x 64 pixels ({} bytes)", thumbnail->GetSizeInBytes());
+					break;
+				case FbxThumbnail::e128x128:
+					HTR_LOG(Info, "        Size: 128 x 128 pixels ({} bytes)", thumbnail->GetSizeInBytes());
+			}
+		}
+	}
+}
+
+void FFbxImporter::DisplayLightSettings(fbxsdk::FbxGlobalSettings* InSettings)
+{
+	FbxColor pValue = InSettings->GetAmbientColor();
+
+	FbxString lString;
+
+	lString = "Ambient Color : ";
+	lString += (float)pValue.mRed;
+
+	lString += " (red), ";
+	lString += (float)pValue.mGreen;
+
+	lString += " (green), ";
+	lString += (float)pValue.mBlue;
+
+	lString += " (blue)";
+
+	HTR_LOG(Info, "{}", lString.Buffer());
+}
+
+void FFbxImporter::DisplayTimeSettings(fbxsdk::FbxGlobalSettings* InSettings)
+{
+	HTR_LOG(Info, "Time Node : {}", FbxGetTimeModeName(InSettings->GetTimeMode()));
+	FbxTimeSpan lTs;
+	FbxTime     lStart, lEnd;
+	char lTimeString[256];
+	InSettings->GetTimelineDefaultTimeSpan(lTs);
+	lStart = lTs.GetStart();
+	lEnd = lTs.GetStop();
+	HTR_LOG(Info, "Timeline default timespan: ");
+	HTR_LOG(Info, "     Start: {}", lStart.GetTimeString(lTimeString, FbxUShort(256)));
+	HTR_LOG(Info, "     Stop : {}", lEnd.GetTimeString(lTimeString, FbxUShort(256)));
+}
+
+void FFbxImporter::DisplayHierarchy(fbxsdk::FbxScene* InScene)
+{
+	int i;
+	FbxNode* lRootNode = InScene->GetRootNode();
+
+	for (i = 0; i < lRootNode->GetChildCount(); i++)
+	{
+		DisplayHierarchy(lRootNode->GetChild(i), 0);
+	}
+}
+
+void FFbxImporter::DisplayHierarchy(fbxsdk::FbxNode* pNode, int pDepth)
+{
+	FbxString lString;
+	int i;
+
+	for (i = 0; i < pDepth; i++)
+	{
+		lString += "  ";
+	}
+
+	lString += pNode->GetName();
+	HTR_LOG(Info, "{}", lString.Buffer());
+
+	for (i = 0; i < pNode->GetChildCount(); i++)
+	{
+		DisplayHierarchy(pNode->GetChild(i), pDepth + 1);
+	}
+}
+
+void FFbxImporter::DisplayContent(fbxsdk::FbxScene* pScene)
+{
+	int i;
+	FbxNode* lNode = pScene->GetRootNode();
+
+	if (lNode)
+	{
+		for (i = 0; i < lNode->GetChildCount(); i++)
+		{
+			DisplayContent(lNode->GetChild(i));
+		}
+	}
+}
+
+void FFbxImporter::DisplayContent(fbxsdk::FbxNode* pNode)
+{
 }
