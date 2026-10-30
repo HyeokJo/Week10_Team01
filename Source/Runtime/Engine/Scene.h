@@ -12,6 +12,8 @@
 
 class FLightSceneProxy;
 class ULightComponentBase;
+class UDecalComponent;
+class FDecalSceneProxy;
 
 struct FExponentialHeightFogSceneInfo
 {
@@ -89,4 +91,15 @@ public:
 	bool bElementListChanged = false;
 	bool bShadowDirty = true;
 	inline static bool bCacheWholeSceneShadows = true;
+
+	void AddDecal(UDecalComponent* Component);
+	void RemoveDecal(UDecalComponent* Component);
+	void RemoveAllDecals();
+
+	void MarkDecalDirty(FDecalSceneProxy* Proxy);
+
+	const TArray<FDecalSceneProxy*>& GetDecalProxies() const { return DecalProxies; }
+private:
+	TArray<FDecalSceneProxy*> DirtyDecals;
+	TArray<FDecalSceneProxy*> DecalProxies;
 };

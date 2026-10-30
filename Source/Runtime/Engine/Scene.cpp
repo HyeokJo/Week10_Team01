@@ -3,6 +3,8 @@
 #include "LightSceneProxy.h"
 #include "Render/ColorWorkflow.h"
 #include <Core/StatOverlay.h>
+#include "Component/DecalComponent.h"
+#include "DecalSceneProxy.h"
 
 void FScene::AddPrimitive(UPrimitiveComponent* Component)
 {
@@ -238,6 +240,13 @@ void FScene::UpdateAllTransforms()
 		Proxy->bQueuedForUpdate = false;
 	}
 	DirtyLights.Reset();
+
+	for (FDecalSceneProxy* Proxy : DirtyDecals)
+	{
+		Proxy->UpdateFromComponent();
+		Proxy->bQueuedForUpdate = false;
+	}
+	DirtyDecals.Reset();
 
 	//const int32 Count = Proxies.Num();
 	//for (int32 i = 0; i < Count; ++i)
@@ -510,5 +519,54 @@ void FScene::BuildStructuredLightAndShadowData(TArray<FPointLightInfo>& OutPoint
 		}
 		}
 	}
+}
+
+void FScene::AddDecal(UDecalComponent* Component)
+{
+	if (!Component || Component->SceneProxy) return;
+
+	FDecalSceneProxy* Proxy = new FDecalSceneProxy(Component);
+
+	Proxy->Scene = this;
+	Component->SceneProxy = Proxy;
+
+	Proxy->UpdateFromComponent();
+	DecalProxies.Add(Proxy);
+}
+
+void FScene::RemoveDecal(UDecalComponent* Component)
+{
+	if (!Component || !Component->SceneProxy) return;
+
+	FDecalSceneProxy* Proxy = Component->SceneProxy;
+
+	const int32 DirtyIndex = DirtyDecals.Find(Proxy);
+	if (DirtyIndex != INDEX_NONE) DirtyDecals.RemoveAt(DirtyIndex);
+
+	const int32 Index = DecalProxies.Find(Proxy);
+	if (Index != INDEX_NONE) DecalProxies.RemoveAt(Index);
+
+	Component->SceneProxy = nullptr;
+	delete Proxy;
+}
+
+void FScene::RemoveAllDecals()
+{
+	for (FDecalSceneProxy* Proxy : DecalProxies)
+	{
+		Proxy->Component->SceneProxy = nullptr;
+		delete Proxy;
+	}
+
+	DecalProxies.Reset();
+	DirtyDecals.Reset();
+}
+
+void FScene::MarkDecalDirty(FDecalSceneProxy* Proxy)
+{
+	if (!Proxy || Proxy->bQueuedForUpdate) return;
+
+	Proxy->bQueuedForUpdate = true;
+	DirtyDecals.Add(Proxy);
 }
 
