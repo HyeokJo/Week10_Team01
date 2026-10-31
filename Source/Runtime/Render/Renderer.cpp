@@ -159,7 +159,7 @@ void FRenderer::RenderDecal(FDecalRenderer& DecalRenderer, const FDecalSceneProx
 {
 	auto DrawReceiver = [&](const FRenderPacket& Receiver)
 	{
-		if(!Receiver.Proxy || !Receiver.Material || Receiver.Material->ParamLayout != EMaterialParamLayout::StaticMesh)
+		if(!Receiver.Proxy || !Receiver.Material || Receiver.Material->ParamLayout != EMaterialParamLayout::StaticMesh || !Receiver.Proxy->IsReceiveDecal())
 		{
 			return;
 		}

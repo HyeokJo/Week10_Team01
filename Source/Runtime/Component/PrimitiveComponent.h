@@ -34,6 +34,7 @@ class UPrimitiveComponent :public USceneComponent
 		PROPERTY(bReceiveShadow)
 		PROPERTY(bGenerateOverlapEvents)
 		PROPERTY(bBlockComponet)
+		PROPERTY(bReceiveDecal)
 		PROPERTY(ShowBeginOverlapLog)
 		PROPERTY(ShowEndOverlapLog)
 		PROPERTY(ShowHitLog)
@@ -133,6 +134,15 @@ public:
 	void SetNotifyScriptCollision(bool bNotify);
 	bool GetNotifyScriptCollision() const;
 
+	bool IsReceiveDecal() const { return bReceiveDecal; }
+	void SetReceiveDecal(bool bInReceiveDecal)
+	{
+		if (bReceiveDecal == bInReceiveDecal)
+			return;
+		bReceiveDecal = bInReceiveDecal;
+		MarkRenderStateDirty();
+	}
+
 protected:
 	bool TraceMesh(const FRay& WorldRay, const FStaticMeshData& Mesh, const FMatrix& WorldMatrix, FHitResult& OutResult);
 	bool TraceMeshLocal(const FRay& LocalRay, const FStaticMeshData& Mesh, float& OutT);
@@ -142,6 +152,7 @@ protected:
 
 	bool bGenerateOverlapEvents = true;
 	bool bBlockComponet = false;
+	bool bReceiveDecal = true;
 
 private:
 	friend class AActor;
