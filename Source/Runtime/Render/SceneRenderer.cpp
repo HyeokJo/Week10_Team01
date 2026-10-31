@@ -354,14 +354,21 @@ void FSceneRenderer::RenderDecalPass(const FSceneView& SceneView, const FSceneRe
 			return A->GetSortOrder() < B->GetSortOrder();
 		});
 
+	bool bReceiversPrepared = false;
 	for (const FDecalSceneProxy* Decal : SortedDecals)
 	{
 		const float ScreenFade = FDecalRenderer::CalculateScreenFade(*Decal, SceneView.ViewProjection, SceneView.bOrthographic);
 		if (ScreenFade <= 0.f)
 			continue;
 
+		if (!bReceiversPrepared)
+		{
+			Renderer->PrepareDecalReceivers();
+			bReceiversPrepared = true;
+		}
+
 		FStatOverlay::AddDecalSubmission();
-		Renderer->RenderDecal(*DecalRenderer, *Decal, SceneView.ViewProjection, ScreenFade);
+		Renderer->RenderDecal(*DecalRenderer, ViewWorld.GetScene(), *Decal, SceneView.ViewProjection, ScreenFade);
 	}
 
 	const uint64 ElapsedCycles = FPlatformTime::GetCycles64() - StartCycles;

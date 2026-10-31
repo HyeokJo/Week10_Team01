@@ -7,6 +7,7 @@
 #include "Core/Stats/LightweightStats.h"
 
 #include "Engine/PrimitiveSceneProxy.h"
+#include "Engine/Scene.h"
 
 #include "RenderCommand.h"
 #include "RenderResourceManager.h"
@@ -155,25 +156,17 @@ void FRenderer::RenderOpaque(const FMatrix& ViewProjection)
 	DrawPackets(0, FirstTranslucentIndex, ViewProjection);
 }
 
-void FRenderer::RenderDecal(FDecalRenderer& DecalRenderer, const FDecalSceneProxy& Decal, const FMatrix& ViewProjection, float ScreenFade)
+void FRenderer::PrepareDecalReceivers()
 {
-	auto DrawReceiver = [&](const FRenderPacket& Receiver)
+	DecalReceivers.clear();
+	const auto AddReceiver = [&](const FRenderPacket& Receiver)
 	{
 		if(!Receiver.Proxy || !Receiver.Material || Receiver.Material->ParamLayout != EMaterialParamLayout::StaticMesh || !Receiver.Proxy->IsReceiveDecal())
 		{
 			return;
 		}
 
-		const FAABB& Bounds = Receiver.Proxy->GetBounds();
-
-		const FBox ReceiverBounds{ Bounds.Center - Bounds.Extent, Bounds.Center + Bounds.Extent };
-
-		if (!Decal.GetBounds().Intersects(ReceiverBounds))
-		{
-			return;
-		}
-
-		DecalRenderer.OnRender(Receiver, Decal, ViewProjection, ScreenFade);
+		DecalReceivers[Receiver.Proxy].push_back(Receiver);
 	};
 
 	for (const FStaticDrawGroup* Group : StaticGroups)
@@ -193,15 +186,34 @@ void FRenderer::RenderDecal(FDecalRenderer& DecalRenderer, const FDecalSceneProx
 			Receiver.StartIndex = Item.StartIndex;
 			Receiver.IndexCount = Item.IndexCount;
 
-			DrawReceiver(Receiver);
+			AddReceiver(Receiver);
 		}
 	}
 
 	for (uint32 Index = 0; Index < FirstTranslucentIndex; ++Index)
 	{
 		const FRenderPacket& Receiver = RenderPackets[SortEntries[Index].PacketIndex];
-		DrawReceiver(Receiver);
+		AddReceiver(Receiver);
 	}
+}
+
+void FRenderer::RenderDecal(FDecalRenderer& DecalRenderer, const FScene& Scene, const FDecalSceneProxy& Decal, const FMatrix& ViewProjection, float ScreenFade)
+{
+	const FBox& DecalBounds = Decal.GetBounds();
+	Scene.BVH.Query(
+		[&DecalBounds](const FBox& Bounds)
+		{
+			return DecalBounds.Intersects(Bounds);
+		},
+		[&](const FPrimitiveSceneProxy* Proxy)
+		{
+			const auto Receiver = DecalReceivers.find(Proxy);
+			if (Receiver == DecalReceivers.end())
+				return;
+
+			for (const FRenderPacket& Packet : Receiver->second)
+				DecalRenderer.OnRender(Packet, Decal, ViewProjection, ScreenFade);
+		});
 }
 
 // RenderOpaque가 남긴 반투명 패킷을 먼 것부터 그린다.
@@ -210,6 +222,7 @@ void FRenderer::RenderTranslucent(const FMatrix& ViewProjection)
 	DrawPackets(FirstTranslucentIndex, SortEntries.Num(), ViewProjection);
 	RenderPackets.Reset();
 	FirstTranslucentIndex = 0;
+	DecalReceivers.clear();
 	StaticGroups.clear();   // 묶음 메모리는 World 것이므로 이번 프레임이 끝나면 놓는다
 }
 
