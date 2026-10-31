@@ -201,7 +201,7 @@ void FOutputLogPanel::ExecCommand(const FString& CommandLine)
 		FLog::Log(ELogVerbosity::Info, "Commands:");
 		for (const FString& Command : Commands)
 			FLog::Log(ELogVerbosity::Info, "- {}", Command);
-		OnLog(ELogVerbosity::Info, "- STAT <fps|memory|all|none>");
+		OnLog(ELogVerbosity::Info, "- STAT <fps|memory|profile|shadow|decal|all|none>");
 	}
 	else if (EqualsIgnoreCase(CommandLine, "HISTORY"))
 	{

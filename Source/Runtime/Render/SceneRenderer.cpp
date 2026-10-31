@@ -12,6 +12,8 @@
 #include "SkyboxRenderer.h"
 #include "Component/TextRenderComponent.h"
 #include "Core/ResourcePaths.h"
+#include "Core/StatOverlay.h"
+#include "Core/Windows/WindowsPlatformTime.h"
 #include "Engine/Scene.h"
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
@@ -53,6 +55,7 @@ void FSceneRenderer::Init(FRenderer* InRenderer)
 void FSceneRenderer::BeginFrame()
 {
 	bShadowAtlasRenderedThisFrame = false;
+	FStatOverlay::ResetDecalStats();
 }
 
 void FSceneRenderer::Render(UWorld& World, const FSceneView& SceneView, const FSceneRenderSettings& Settings,
@@ -330,13 +333,18 @@ void FSceneRenderer::RenderDecalPass(const FSceneView& SceneView, const FSceneRe
 	if (ViewMode != EViewMode::Lit && ViewMode != EViewMode::Unlit)
 		return;
 
+	const uint64 StartCycles = FPlatformTime::GetCycles64();
 	const bool bGameView = ViewWorld.GetWorldType() != EWorldType::Editor;
 
 	for (const FDecalSceneProxy* Decal : ViewWorld.GetScene().GetDecalProxies())
 	{
-		if (!Decal || bGameView && Decal->IsHiddenInGame())
+		if (!Decal || (bGameView && Decal->IsHiddenInGame()))
 			continue;
 
+		FStatOverlay::AddDecalSubmission();
 		Renderer->RenderDecal(*DecalRenderer, *Decal, SceneView.ViewProjection);
 	}
+
+	const uint64 ElapsedCycles = FPlatformTime::GetCycles64() - StartCycles;
+	FStatOverlay::AddDecalCPUTime(FPlatformTime::ToMilliseconds64(ElapsedCycles));
 }

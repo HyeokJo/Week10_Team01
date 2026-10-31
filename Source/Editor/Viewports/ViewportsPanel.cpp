@@ -580,6 +580,15 @@ void FViewportsPanel::DrawStatOverlay(ImDrawList* DrawList, const ImVec2& ViewMi
 			static_cast<int64>(shadow.ShadowMapMemoryBytes) / BytesPerMegabyte), ValueColor });
 	}
 
+	if (FStatOverlay::IsEnabled(EStatFlags::Decal))
+	{
+		const FDecalStats& Decal = FStatOverlay::GetDecalStats();
+		Lines.Add({ "Decal (all views / frame)", TitleColor });
+		Lines.Add({ std::format("  Submissions  {}", Decal.SubmittedDecals), ValueColor });
+		Lines.Add({ std::format("  Draw Calls   {}", Decal.DrawCalls), ValueColor });
+		Lines.Add({ std::format("  CPU Time     {:.3f} ms", Decal.CPUTimeMs), ValueColor });
+	}
+
 	struct FProfileStatLine
 	{
 		FString Text;

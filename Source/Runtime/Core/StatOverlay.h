@@ -11,6 +11,7 @@ enum class EStatFlags : uint32
 	Memory  = 1 << 1,
 	Profile = 1 << 2,
 	Shadow = 1 << 3,
+	Decal = 1 << 4,
 };
 
 struct FShadowStats {
@@ -23,6 +24,14 @@ struct FShadowStats {
 	int32 NumSkippedCasterDraws = 0;	// 생략된 Caster 그리기 횟수
 	int32 NumCachedShadowMaps = 0;
 	int64 ShadowMapMemoryBytes = 0;
+};
+
+// 프레임 내 모든 View의 처리 요청과 실제 드로우 호출을 합산한다.
+struct FDecalStats
+{
+	int32 SubmittedDecals = 0;
+	int32 DrawCalls = 0;
+	double CPUTimeMs = 0.0;
 };
 
 DEFINE_ENUM_OPERATORS(EStatFlags)
@@ -56,6 +65,12 @@ public:
 	static void SetShadowStats(const FShadowStats& inShadowStats) { ShadowStats = inShadowStats; }
 	static const FShadowStats & GetShadowStats() { return ShadowStats; }
 
+	static void ResetDecalStats() { DecalStats = FDecalStats{}; }
+	static const FDecalStats& GetDecalStats() { return DecalStats; }
+	static void AddDecalSubmission() { ++DecalStats.SubmittedDecals; }
+	static void AddDecalDrawCall() { ++DecalStats.DrawCalls; }
+	static void AddDecalCPUTime(double TimeMs) { DecalStats.CPUTimeMs += TimeMs; }
+
 private:
 	// 표시 수치 갱신 주기(초). 너무 짧으면 숫자가 읽히지 않는다.
 	static constexpr float SampleInterval = 0.25f;
@@ -66,4 +81,5 @@ private:
 	inline static float DisplayFPS = 0.0f;
 	inline static float DisplayFrameTimeMs = 0.0f;
 	inline static FShadowStats ShadowStats;
+	inline static FDecalStats DecalStats;
 };

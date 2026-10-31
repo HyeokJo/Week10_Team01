@@ -1,6 +1,8 @@
 #include "EnginePCH.h"
 #include "DecalRenderer.h"
 
+#include "Core/StatOverlay.h"
+
 #include "Engine/DecalSceneProxy.h"
 #include "Engine/PrimitiveSceneProxy.h"
 #include "Render/RenderCommand.h"
@@ -74,6 +76,7 @@ void FDecalRenderer::OnRender(const FRenderPacket& Receiver, const FDecalScenePr
 	const uint32 IndexCount = Receiver.IndexCount != 0 ? Receiver.IndexCount : Receiver.Mesh->GetIndexBuffer(Receiver.LODIndex)->GetIndexCount();
 	
 	RenderCommand::DrawIndexed(IndexCount, Receiver.StartIndex);
+	FStatOverlay::AddDecalDrawCall();
 
 	RenderCommand::UnbindShaderResource(0, EShaderBindFlagBits::Pixel);
 }
