@@ -2,6 +2,7 @@
 
 #include "GameFramework/Actor.h"
 #include "Component/DecalComponent.h"
+#include "Component/BillboardComponent.h"
 
 class ADecalActor : public AActor
 {
@@ -12,4 +13,5 @@ public:
 	UDecalComponent* GetDecalComponent() const { return DecalComponent; }
 private:
 	UDecalComponent* DecalComponent = nullptr;
+	UBillboardComponent* BillboardComponent = nullptr;
 };
