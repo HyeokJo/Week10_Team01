@@ -22,6 +22,8 @@
 #include "DecalRenderer.h"
 #include "Engine/DecalSceneProxy.h"
 
+#include <algorithm>
+
 FSceneRenderer::FSceneRenderer() = default;
 
 FSceneRenderer::~FSceneRenderer() = default;
@@ -336,11 +338,24 @@ void FSceneRenderer::RenderDecalPass(const FSceneView& SceneView, const FSceneRe
 	const uint64 StartCycles = FPlatformTime::GetCycles64();
 	const bool bGameView = ViewWorld.GetWorldType() != EWorldType::Editor;
 
+	TArray<const FDecalSceneProxy*> SortedDecals;
+	SortedDecals.Reserve(ViewWorld.GetScene().GetDecalProxies().Num());
 	for (const FDecalSceneProxy* Decal : ViewWorld.GetScene().GetDecalProxies())
 	{
 		if (!Decal || (bGameView && Decal->IsHiddenInGame()))
 			continue;
 
+		SortedDecals.Add(Decal);
+	}
+
+	std::stable_sort(SortedDecals.begin(), SortedDecals.end(),
+		[](const FDecalSceneProxy* A, const FDecalSceneProxy* B)
+		{
+			return A->GetSortOrder() < B->GetSortOrder();
+		});
+
+	for (const FDecalSceneProxy* Decal : SortedDecals)
+	{
 		FStatOverlay::AddDecalSubmission();
 		Renderer->RenderDecal(*DecalRenderer, *Decal, SceneView.ViewProjection);
 	}

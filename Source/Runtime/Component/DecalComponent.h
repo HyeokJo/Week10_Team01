@@ -14,6 +14,7 @@ class UDecalComponent : public USceneComponent
 		PROPERTY(TexturePath)
 		PROPERTY(Opacity)
 		PROPERTY(DecalColor)
+		PROPERTY(SortOrder)
 		PROPERTY(FadeInStartDelay)
 		PROPERTY(FadeInDuration)
 		PROPERTY(FadeStartDelay)
@@ -45,6 +46,14 @@ public:
 	const float GetOpacity() const { return Opacity; }
 	const FLinearColor& GetDecalColor() const { return DecalColor; }
 	float GetRenderOpacity() const { return Opacity * GetFadeAlpha(); }
+	int32 GetSortOrder() const { return SortOrder; }
+	void SetSortOrder(int32 InSortOrder)
+	{
+		if (SortOrder == InSortOrder)
+			return;
+		SortOrder = InSortOrder;
+		MarkSceneProxyDirty();
+	}
 
 	FBox CalcLocalBounds() const override;
 
@@ -60,6 +69,7 @@ private:
 	FString TexturePath;
 	float Opacity = 1.f;
 	FLinearColor DecalColor = FLinearColor(1.f, 1.f, 1.f, 1.f);
+	int32 SortOrder = 0;
 
 	// Both delays are measured from BeginPlay. Zero duration makes an instant transition.
 	float FadeInStartDelay = 0.f;

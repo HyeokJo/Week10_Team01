@@ -26,6 +26,7 @@ public:
 
 	float GetOpacity() const { return Opacity; }
 	const FLinearColor& GetDecalColor() const { return DecalColor; }
+	int32 GetSortOrder() const { return SortOrder; }
 	bool IsHiddenInGame() const { return bHiddenInGame; }
 
 	UTexture2D* GetTexture() const { return Texture; }
@@ -44,6 +45,7 @@ private:
 	FString TexturePath;
 	float Opacity = 1.0f;
 	FLinearColor DecalColor = FLinearColor(1.f, 1.f, 1.f, 1.f);
+	int32 SortOrder = 0;
 	bool bHiddenInGame = false;
 
 	UTexture2D* Texture = nullptr;
