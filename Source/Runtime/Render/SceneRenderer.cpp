@@ -57,7 +57,7 @@ void FSceneRenderer::BeginFrame()
 }
 
 void FSceneRenderer::Render(UWorld& World, const FSceneView& SceneView, const FSceneRenderSettings& Settings,
-	const FRenderingInfo& SceneInfo, const FRenderingInfo& ViewInfo, FTexture2D* FxaaTemp, FRenderQueue& RenderQueue)
+	const FRenderingInfo& SceneInfo, const FRenderingInfo& ViewInfo, FTexture2D* DecalBaseColorTarget, FTexture2D* FxaaTemp, FRenderQueue& RenderQueue)
 {
 	FLightingConstants Lighting;
 	FShadowStats ShadowStats{};
@@ -125,16 +125,11 @@ void FSceneRenderer::Render(UWorld& World, const FSceneView& SceneView, const FS
 	FStatOverlay::SetDecalStats(DecalStats);
 
 	// 1. 불투명·반투명 Pass (Linear 씬 컬러)
-	RenderOpaquePass(SceneView, Settings, World, SceneInfo, RenderQueue, Lighting.Directional);
+	RenderOpaquePass(SceneView, Settings, World, SceneInfo, RenderQueue, Lighting.Directional, DecalBaseColorTarget, FrustumPlanes);
 
 	// 데이터 시각화 뷰는 씬 컬러 값 자체가 결과이므로 안개·인코딩·FXAA로 값을 바꾸지 않는다.
 	const EViewMode ViewMode = SceneView.RenderMode.ViewMode;
 	const bool bVisualizeData = IsDataVisualization(ViewMode);
-
-	if (Settings.bDrawDecals && !Settings.bDepthView && !bVisualizeData)
-	{
-		RenderDecalPass(SceneView, Settings, World, SceneInfo, FrustumPlanes);
-	}
 
 	RenderTranslucentPass(SceneView, Settings, World, SceneInfo);
 
@@ -162,32 +157,92 @@ void FSceneRenderer::Render(UWorld& World, const FSceneView& SceneView, const FS
 }
 
 void FSceneRenderer::RenderOpaquePass(const FSceneView& SceneView, const FSceneRenderSettings& Settings, const UWorld& ViewWorld, 
-									  const FRenderingInfo& SceneInfo, FRenderQueue& RenderQueue, const FDirectionalLightInfo& DirectionalLight)
+									const FRenderingInfo& SceneInfo, FRenderQueue& RenderQueue, const FDirectionalLightInfo& DirectionalLight, 
+									FTexture2D* DecalBaseColorTarget, const FFrustumPlanes& FrustumPlanes)
 {
-	// 뷰 모드가 셰이더 permutation을, Wireframe 여부가 Fill Mode를 정한다. 삼각형 연결은 그대로다.
 	const FViewRenderMode ViewRenderMode = SceneView.RenderMode;
-	const bool bVisualizeLightCount = Settings.bVisualizeTileLightCount;
-	if (ViewRenderMode.ViewMode == EViewMode::Lit)
-	{
-		Renderer->EnsureTileLightCapacity(
-			SceneView.ViewProjection,
-			SceneInfo.ViewportSetting.Width,
-			SceneInfo.ViewportSetting.Height, bVisualizeLightCount);
-	}
-
-	// 배경은 화면에서 sRGB 0.3 회색으로 보여야 한다. Linear 작업 흐름에서는 인코딩될 것이므로 디코딩해 지운다.
-	FRenderingInfo PassInfo = SceneInfo;
-	const float ClearValue = ColorWorkflow::bLinear ? FLinearColor::SRGBToLinear(0.3f) : 0.3f;
-	PassInfo.ColorRenderTargets[0].ClearValue.ColorClearValue = FVector4(ClearValue, ClearValue, ClearValue, 1.0f);
-	RenderCommand::BeginRenderPass(PassInfo);
 
 	const bool bDrawPrimitives = Settings.bDrawPrimitives;
-	const ERasterizerState SceneRasterizerState = ViewRenderMode.ViewMode == EViewMode::Wireframe
-		? ERasterizerState::Wireframe : ERasterizerState::SolidBack;
+	const bool bVisualizeLightCount = Settings.bVisualizeTileLightCount;
 
-	// 렌더 루프 — 반드시 RenderAll보다 먼저
-	// 직교는 시선이 모두 평행해 파노라마의 한 점만 확대되므로 하늘을 그리지 않고 지우기 색을 배경으로 쓴다.
-	// 데이터 시각화 뷰도 하늘은 데이터가 없으므로 그리지 않는다.
+	const TArray<UDecalComponent*>& Decals = ViewWorld.GetScene().GetDecalComponents();
+
+	const bool bUseDecals = Settings.bDrawDecals && !Settings.bDepthView && !IsDataVisualization(ViewRenderMode.ViewMode) &&
+		!Settings.bVisualizeCascades && !Settings.bVisualizeTileLightCount && bDrawPrimitives && !Decals.IsEmpty() && DecalBaseColorTarget != nullptr;
+
+	const ERasterizerState SceneRasterizerState = ViewRenderMode.ViewMode == EViewMode::Wireframe ? ERasterizerState::Wireframe : ERasterizerState::SolidBack;
+
+	Renderer->SetDecalBaseColorTexture(nullptr);
+
+	if (ViewRenderMode.ViewMode == EViewMode::Lit)
+	{
+		Renderer->EnsureTileLightCapacity(SceneView.ViewProjection, SceneInfo.ViewportSetting.Width, SceneInfo.ViewportSetting.Height, bVisualizeLightCount);
+	}
+
+	// ==========================================
+	// 공통 준비: RenderQueue 정렬
+	// ==========================================
+
+	if (bDrawPrimitives)
+	{
+		RenderCommand::SetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+		Renderer->RenderQueueSorting(RenderQueue, SceneView.ViewProjection, SceneView.Location);
+	}
+
+	if (bUseDecals)
+	{
+		FRenderingInfo DepthPassInfo = SceneInfo;
+
+		for (FRenderingDesc& Color : DepthPassInfo.ColorRenderTargets)
+		{
+			Color.LoadOp = ERenderTargetLoadOp::Load;
+		}
+
+		DepthPassInfo.DepthStencil.LoadOp = ERenderTargetLoadOp::Clear;
+
+		DepthPassInfo.DepthStencil.ClearValue.DepthClearValue = 1.0f;
+		DepthPassInfo.DepthStencil.ClearValue.StencilClearValue = 0;
+
+		RenderCommand::UnbindShaderResource(0, EShaderBindFlagBits::Pixel);
+
+		RenderCommand::BeginRenderPass(DepthPassInfo);
+
+		RenderCommand::SetRasterizerState(SceneRasterizerState);
+		RenderCommand::SetBlendState(EBlendState::NoColorWrite);
+		RenderCommand::SetDepthStencilState(EDepthStencilState::Default);
+
+		FViewRenderMode DepthMode = ViewRenderMode;
+		DepthMode.ViewMode = EViewMode::Unlit;
+
+		Renderer->SetViewMode(DepthMode);
+
+		Renderer->SetOpaquePassMode(EOpaquePassMode::DepthPrepass);
+
+		Renderer->RenderOpaque(SceneView.ViewProjection);
+
+		RenderCommand::EndRenderPass();
+
+		RenderDecalPass(SceneView, Settings, ViewWorld, SceneInfo, DecalBaseColorTarget, FrustumPlanes);
+
+		Renderer->BindShadowForShading();
+
+		Renderer->SetDecalBaseColorTexture(DecalBaseColorTarget);
+	}
+
+	FRenderingInfo PassInfo = SceneInfo;
+
+	const float ClearValue = ColorWorkflow::bLinear ? FLinearColor::SRGBToLinear(0.3f) : 0.3f;
+
+	PassInfo.ColorRenderTargets[0].ClearValue.ColorClearValue = FVector4(ClearValue, ClearValue, ClearValue, 1.0f);
+
+	if (bUseDecals)
+	{
+		PassInfo.DepthStencil.LoadOp = ERenderTargetLoadOp::Load;
+	}
+
+	RenderCommand::BeginRenderPass(PassInfo);
+
 	if (!SceneView.bOrthographic && !IsDataVisualization(ViewRenderMode.ViewMode))
 	{
 		SkyboxRenderer->OnRender(SceneView.ViewProjection, SceneView.Location, DirectionalLight);
@@ -198,20 +253,16 @@ void FSceneRenderer::RenderOpaquePass(const FSceneView& SceneView, const FSceneR
 		RenderCommand::SetRasterizerState(SceneRasterizerState);
 		RenderCommand::SetBlendState(EBlendState::Opaque);
 		RenderCommand::SetDepthStencilState(EDepthStencilState::Default);
-
 		RenderCommand::SetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		Renderer->SetViewMode(ViewRenderMode);
-		// 불투명을 먼저 그리고 반투명을 먼 것부터 그린다.
-		// Grid는 깊이를 쓰지 않는 반투명 위에도 겹칠 수 있지만, 언리얼의 에디터 프리미티브처럼 Overlay Pass에서 마지막에 합성한다.
-		Renderer->RenderQueueSorting(RenderQueue, SceneView.ViewProjection, SceneView.Location);
+		Renderer->SetOpaquePassMode(bUseDecals ? EOpaquePassMode::DepthReadOnly : EOpaquePassMode::Normal);
 		Renderer->RenderOpaque(SceneView.ViewProjection);
 		DrawWorldText(SceneView, ViewWorld);
-		RenderCommand::SetRasterizerState(SceneRasterizerState);
 		RenderCommand::SetRasterizerState(ERasterizerState::SolidBack);
 	}
 
-
 	RenderCommand::EndRenderPass();
+	Renderer->SetDecalBaseColorTexture(nullptr);
 }
 
 void FSceneRenderer::DrawWorldText(const FSceneView& SceneView, const UWorld& ViewWorld)
@@ -329,7 +380,7 @@ void FSceneRenderer::RenderDepthPass(const FSceneView& SceneView, const FRenderi
 	RenderCommand::EndRenderPass();
 }
 
-void FSceneRenderer::RenderDecalPass(const FSceneView& SceneView, const FSceneRenderSettings& Settings, const UWorld& ViewWorld, const FRenderingInfo& SceneInfo, const FFrustumPlanes& FrustumPlanes)
+void FSceneRenderer::RenderDecalPass(const FSceneView& SceneView, const FSceneRenderSettings& Settings, const UWorld& ViewWorld, const FRenderingInfo& SceneInfo, FTexture2D* DecalBaseColorTarget, const FFrustumPlanes& FrustumPlanes)
 {
 	const uint64 StartCycles = FPlatformTime::GetCycles64();
 
@@ -371,12 +422,13 @@ void FSceneRenderer::RenderDecalPass(const FSceneView& SceneView, const FSceneRe
 	FFrustumCorners FrustumCorners{};
 	const bool bHasFrustumCorners = ExtractFrustumCorners(SceneView.ViewProjection, FrustumCorners);
 
-	FRenderingInfo PassInfo = SceneInfo;
-
-	for (FRenderingDesc& Color : PassInfo.ColorRenderTargets)
-	{
-		Color.LoadOp = ERenderTargetLoadOp::Load;
-	}
+	FRenderingInfo PassInfo{};
+	PassInfo.ViewportSetting = SceneInfo.ViewportSetting;
+	FRenderingDesc DecalColorDesc{};
+	DecalColorDesc.Texture = DecalBaseColorTarget;
+	DecalColorDesc.LoadOp = ERenderTargetLoadOp::Clear;
+	DecalColorDesc.ClearValue.ColorClearValue = FVector4(0.0f, 0.0f, 0.0f, 0.0f);
+	PassInfo.ColorRenderTargets.Add(DecalColorDesc);
 
 	PassInfo.DepthStencil.Texture = nullptr;
 

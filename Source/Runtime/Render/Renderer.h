@@ -64,6 +64,20 @@ struct FOcclusionMeasureResult
 	uint32 FalseCulls = 0;        // 그중 실제로는 픽셀이 보인 드로우 수. 0이어야 한다
 };
 
+struct FDecalCompositeConstants
+{
+	uint32 bEnableDecalBaseColor = 0;
+	uint32 Padding[3] = {};
+};
+static_assert(sizeof(FDecalCompositeConstants) == 16);
+
+enum class EOpaquePassMode : uint8
+{
+	Normal,
+	DepthPrepass,
+	DepthReadOnly
+};
+
 class FRenderer
 {
 public:
@@ -127,6 +141,10 @@ public:
 	//ImGui용 PreviewSRV 반환
 	//ID3D11ShaderResourceView* GetShadowPreviewSRV() const { return ShadowMapManager.GetPreviewSRV(); }
 
+	void SetOpaquePassMode(EOpaquePassMode Mode) { OpaquePassMode = Mode; }
+
+	void SetDecalBaseColorTexture(FTexture2D* Texture);
+
 private:
 	// FIFO 소비용 배열의 용량만 재사용하며 매 View의 패킷 값은 새로 채운다.
 	FRenderQueue RenderPackets;
@@ -173,4 +191,10 @@ private:
 	FShadowMapManager ShadowMapManager;
 	// Init()에서 CreateConstantBuffer(sizeof(FMatrix))
 	TUniquePtr<FConstantBuffer> ShadowViewCB;   
+
+	EOpaquePassMode OpaquePassMode = EOpaquePassMode::Normal;
+
+	TUniquePtr<FConstantBuffer> DecalCompositeCB;
+
+	void ApplyOpaquePassState(const UMaterial* Material, const FPrimitiveSceneProxy* Proxy);
 };

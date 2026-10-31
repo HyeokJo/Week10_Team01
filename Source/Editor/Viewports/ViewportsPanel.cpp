@@ -96,6 +96,12 @@ FTexture2D* FViewportsPanel::GetFxaaTarget(const int32 ViewIndex) const
 	return Slots[ViewIndex].FxaaTarget.get();
 }
 
+FTexture2D* FViewportsPanel::GetDecalBaseColorTarget(int32 ViewIndex) const
+{
+	assert(ViewIndex >= 0 && ViewIndex < 4);
+	return Slots[ViewIndex].DecalBaseColorTarget.get();
+}
+
 // 마우스 위치에서 패널 원점을 빼 로컬 좌표로 바꾼다.
 FVector2 FViewportsPanel::GetLocalMousePosition() const
 {
@@ -716,7 +722,7 @@ void FViewportsPanel::ResizeSlot(FViewSlot& Slot, const uint32 Width, const uint
 	// Linear 값을 8비트에 담으면 어두운 영역이 뭉개지고 1을 넘는 값이 잘리므로 씬 컬러는 float로 만든다
 	Desc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
 	Slot.SceneColorTarget = RenderCommand::CreateTexture2D(Desc);
-
+	Slot.DecalBaseColorTarget = RenderCommand::CreateTexture2D(Desc);
 	// Fog 패스가 깊이를 셰이더에서 읽으므로 DSV와 SRV를 둘 다 만들 수 있는 TYPELESS로 만든다
 	Desc.Format = DXGI_FORMAT_R24G8_TYPELESS;
 	Desc.BindFlags = D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE;

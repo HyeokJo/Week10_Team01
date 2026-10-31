@@ -192,11 +192,18 @@ cbuffer ShadowFilterConstants : register(b6)
     float ShadowFilterPadding;
 };
 
+cbuffer DecalCompositeConstants : register(b7)
+{
+    uint bEnableDecalBaseColor;
+    uint3 DecalCompositePadding;
+};
+
 StructuredBuffer<FPointLightInfo> StructuredPointLights : register(t8);
 StructuredBuffer<FSpotLightInfo> StructuredSpotLights : register(t9);
 StructuredBuffer<uint> PointTileList : register(t10);
 StructuredBuffer<uint> SpotTileList : register(t11);
 StructuredBuffer<FShadowInfo> StructuredShadowData : register(t12);
+Texture2D<float4> DecalBaseColorTexture : register(t13);
 
 Texture2D AlbedoTexture : register(t0);
 
@@ -904,11 +911,15 @@ float4 mainPS(FPSInput Input) : SV_TARGET
     float4 TextureColor = AlbedoTexture.Sample(AlbedoSampler, Input.UV + UVScrollOffset);
     float4 SurfaceColor = TextureColor * BaseColor;
 
-    float3 Albedo = SurfaceColor.rgb;
+    float Albedo = SurfaceColor.rgb;
     float Alpha = bOpaque ? 1.0f : SurfaceColor.a;
-
+    if(bEnableDecalBaseColor != 0u)
+    {
+        float4 DecalColor = DecalBaseColorTexture.Load(int3(int2(Input.Position.xy), 0));
+        Albedo = DecalColor.rgb + Albedo * (1.0f - DecalColor.a);
+    }
     float3 Kd = Albedo;
-    float3 Ka = Kd; // 나중에 Ka 를 개별로 설정할 수 있음
+    float3 Ka = Kd;
     float3 Ks = SpecularColor;
     
     float3 Normal = normalize(Input.Normal);
