@@ -20,6 +20,9 @@
 #include "Engine/LightSceneProxy.h"
 #include <Core/StatOverlay.h>
 
+#include "DecalRenderer.h"
+#include "Engine/DecalSceneProxy.h"
+
 DECLARE_CYCLE_STAT("Draw Render Packets", STAT_DrawRenderPackets);
 DECLARE_CYCLE_STAT("Render Queue Sorting", STAT_RenderQueueSorting);
 DECLARE_CYCLE_STAT("Upload Per-Object CB", STAT_UploadPerObjectCB);
@@ -150,6 +153,55 @@ void FRenderer::RenderOpaque(const FMatrix& ViewProjection)
 {
 	DrawStaticGroups();
 	DrawPackets(0, FirstTranslucentIndex, ViewProjection);
+}
+
+void FRenderer::RenderDecal(FDecalRenderer& DecalRenderer, const FDecalSceneProxy& Decal, const FMatrix& ViewProjection)
+{
+	auto DrawReceiver = [&](const FRenderPacket& Receiver)
+	{
+		if(!Receiver.Proxy || !Receiver.Material || Receiver.Material->ParamLayout != EMaterialParamLayout::StaticMesh)
+		{
+			return;
+		}
+
+		const FAABB& Bounds = Receiver.Proxy->GetBounds();
+
+		const FBox ReceiverBounds{ Bounds.Center - Bounds.Extent, Bounds.Center + Bounds.Extent };
+
+		if (!Decal.GetBounds().Intersects(ReceiverBounds))
+		{
+			return;
+		}
+
+		DecalRenderer.OnRender(Receiver, Decal, ViewProjection);
+	};
+
+	for (const FStaticDrawGroup* Group : StaticGroups)
+	{
+		for (const FStaticDrawItem& Item : Group->Items)
+		{
+			if (Item.IndexCount == 0)
+			{
+				continue;
+			}
+
+			FRenderPacket Receiver{};
+			Receiver.Proxy = Item.Proxy;
+			Receiver.Mesh = Group->Mesh;
+			Receiver.Material = Group->Material;
+			Receiver.LODIndex = Group->LODIndex;
+			Receiver.StartIndex = Item.StartIndex;
+			Receiver.IndexCount = Item.IndexCount;
+
+			DrawReceiver(Receiver);
+		}
+	}
+
+	for (uint32 Index = 0; Index < FirstTranslucentIndex; ++Index)
+	{
+		const FRenderPacket& Receiver = RenderPackets[SortEntries[Index].PacketIndex];
+		DrawReceiver(Receiver);
+	}
 }
 
 // RenderOpaque가 남긴 반투명 패킷을 먼 것부터 그린다.

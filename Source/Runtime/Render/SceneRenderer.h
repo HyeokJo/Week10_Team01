@@ -17,6 +17,7 @@ class FTexture2D;
 struct FRenderingInfo;
 class UWorld;
 class FRenderer;
+class FDecalRenderer;
 
 struct FSceneView
 {
@@ -89,4 +90,8 @@ private:
 	const UWorld* ShadowAtlasWorld = nullptr;
 	TArray<FShadowInfo> ShadowAtlasInfos;
 	bool bShadowAtlasRenderedThisFrame = false;
+
+	void RenderDecalPass(const FSceneView& SceneView, const FSceneRenderSettings& Settings, const UWorld& ViewWorld);
+
+	TUniquePtr<FDecalRenderer> DecalRenderer;
 };

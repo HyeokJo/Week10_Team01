@@ -17,6 +17,8 @@
 #include "GameFramework/Actor.h"
 #include "Text/TextRenderer.h"
 #include "UObject/UObjectIterator.h"
+#include "DecalRenderer.h"
+#include "Engine/DecalSceneProxy.h"
 
 FSceneRenderer::FSceneRenderer() = default;
 
@@ -43,6 +45,9 @@ void FSceneRenderer::Init(FRenderer* InRenderer)
 
 	TextRenderer = MakeUnique<FTextRenderer>();
 	TextRenderer->Init();
+
+	DecalRenderer = MakeUnique<FDecalRenderer>();
+	DecalRenderer->Init();
 }
 
 void FSceneRenderer::BeginFrame()
@@ -188,6 +193,7 @@ void FSceneRenderer::RenderOpaquePass(const FSceneView& SceneView, const FSceneR
 		// Grid는 깊이를 쓰지 않는 반투명 위에도 겹칠 수 있지만, 언리얼의 에디터 프리미티브처럼 Overlay Pass에서 마지막에 합성한다.
 		Renderer->RenderQueueSorting(RenderQueue, SceneView.ViewProjection, SceneView.Location);
 		Renderer->RenderOpaque(SceneView.ViewProjection);
+		RenderDecalPass(SceneView, Settings, ViewWorld);
 		DrawWorldText(SceneView, ViewWorld);
 		RenderCommand::SetRasterizerState(SceneRasterizerState); // TextRenderer가 상태를 바꾸므로 되돌림
 		Renderer->RenderTranslucent(SceneView.ViewProjection);
@@ -312,4 +318,25 @@ void FSceneRenderer::RenderDepthPass(const FSceneView& SceneView, const FRenderi
 	RenderCommand::BeginRenderPass(PassInfo);
 	DepthViewRenderer->OnRender(ViewInfo.DepthStencil.Texture, SceneView.ViewProjection, SceneView.Location, SceneView.Forward);
 	RenderCommand::EndRenderPass();
+}
+
+void FSceneRenderer::RenderDecalPass(const FSceneView& SceneView, const FSceneRenderSettings& Settings, const UWorld& ViewWorld)
+{
+	if(!DecalRenderer || Settings.bDepthView || Settings.bVisualizeTileLightCount)
+		return;
+
+	const EViewMode ViewMode = SceneView.RenderMode.ViewMode;
+
+	if (ViewMode != EViewMode::Lit && ViewMode != EViewMode::Unlit)
+		return;
+
+	const bool bGameView = ViewWorld.GetWorldType() != EWorldType::Editor;
+
+	for (const FDecalSceneProxy* Decal : ViewWorld.GetScene().GetDecalProxies())
+	{
+		if (!Decal || bGameView && Decal->IsHiddenInGame())
+			continue;
+
+		Renderer->RenderDecal(*DecalRenderer, *Decal, SceneView.ViewProjection);
+	}
 }
