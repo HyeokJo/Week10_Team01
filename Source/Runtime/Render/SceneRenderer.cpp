@@ -421,7 +421,7 @@ void FSceneRenderer::RenderDecalPass(const FSceneView& SceneView, const FSceneRe
 			}
 		});
 
-	DecalStats.NumFrustumCulledDecals = std::max(0, NumVisibleDecals - DecalStats.NumInFrustumDecals);
+	DecalStats.NumFrustumCulledDecals = std::max(0, NumVisibleDecals - DecalStats.NumOBBCulledDecals - DecalStats.NumInFrustumDecals);
 
 	RenderCommand::EndRenderPass();
 

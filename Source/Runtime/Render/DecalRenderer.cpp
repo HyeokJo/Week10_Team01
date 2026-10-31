@@ -38,7 +38,7 @@ bool FDecalRenderer::OnRender(FTexture2D* DepthTexture, const FMatrix& ViewProje
     {
         Material = UAssetManager::GetAssetByPath<UMaterial>("DefaultMaterial");
     }
-    if (!DepthTexture || !DepthTexture->GetStencilSRV() ||  Material->Textures.Num() <= 0 || !Material->Textures[0])
+    if (!DepthTexture || !DepthTexture->GetStencilSRV() || !Material || Material->Textures.Num() <= 0 || !Material->Textures[0])
     {
         return false;
     }

@@ -32,7 +32,7 @@ namespace
 		case ESamplerState::Point:
 			return "Point";
 		case ESamplerState::Comparison_Linear:
-			"Comparison_Linear";
+			return "Comparison_Linear";
 		
 		default:
 			return "LinearClamp";
