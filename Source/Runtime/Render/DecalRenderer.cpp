@@ -62,6 +62,7 @@ void FDecalRenderer::OnRender(const FRenderPacket& Receiver, const FDecalScenePr
 	Constants.WorldToDecal = Decal.GetWorldToDecal();
 	Constants.DecalSize = Decal.GetDecalSize();
 	Constants.Opacity = Decal.GetOpacity();
+	Constants.DecalColor = Decal.GetDecalColor();
 
 	RenderCommand::BindMesh(Receiver.Mesh, Receiver.LODIndex);
 	RenderCommand::BindPipelineState(PipelineState);

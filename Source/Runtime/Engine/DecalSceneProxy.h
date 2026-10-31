@@ -3,6 +3,7 @@
 #include "Core/EngineString.h"
 #include "Math/EngineMath.h"
 #include "Math/Frustum.h"
+#include "Math/Color.h"
 
 class FScene;
 class UDecalComponent;
@@ -24,6 +25,7 @@ public:
 	const FString& GetTexturePath() const { return TexturePath; }
 
 	float GetOpacity() const { return Opacity; }
+	const FLinearColor& GetDecalColor() const { return DecalColor; }
 	bool IsHiddenInGame() const { return bHiddenInGame; }
 
 	UTexture2D* GetTexture() const { return Texture; }
@@ -41,6 +43,7 @@ private:
 	FBox Bounds{};
 	FString TexturePath;
 	float Opacity = 1.0f;
+	FLinearColor DecalColor = FLinearColor(1.f, 1.f, 1.f, 1.f);
 	bool bHiddenInGame = false;
 
 	UTexture2D* Texture = nullptr;

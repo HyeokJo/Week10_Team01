@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Math/EngineMath.h"
+#include "Math/Color.h"
 #include "Render/Buffer.h"
 #include "Render/PipelineState.h"
 
@@ -15,9 +16,10 @@ struct FDecalConstants
 
 	FVector DecalSize;
 	float Opacity;
+	FLinearColor DecalColor;
 };
 
-static_assert(sizeof(FDecalConstants) == 208);
+static_assert(sizeof(FDecalConstants) == 224);
 
 class FDecalRenderer
 {

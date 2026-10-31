@@ -16,7 +16,8 @@ void FDecalSceneProxy::UpdateFromComponent()
 		TexturePath = NewTexturePath;
 		Texture = TexturePath.empty() ? nullptr : UAssetManager::Get().LoadTexture(TexturePath);
 	}
-	Opacity = Component->GetOpacity();
+	Opacity = Component->GetRenderOpacity();
+	DecalColor = Component->GetDecalColor();
 	bHiddenInGame = Component->IsHiddenInGame();
 
 	const FBox LocalBounds{ -DecalSize, DecalSize };
