@@ -5,12 +5,18 @@
 struct FRect { float X, Y, Width, Height; };
 struct FPlane { FVector Normal; float Distance; };
 struct FFrustumPlanes { FPlane Planes[6]; };
+struct FFrustumCorners { FVector Points[8]; };
+struct FOrientedBox { FVector Center; FVector Axes[3]; FVector Extent; };
 struct FAABB { FVector Center; FVector Extent; };
 
 static FPlane NormalizePlane(const FPlane Plane);
 FFrustumPlanes ExtractFrustumPlanes(const FMatrix& Matrix);
 bool IsAABBInFrustum(const FAABB& Bounds, const FFrustumPlanes& Frustum);
 FAABB MakeWorldBounds(const FBox& Value);
+
+bool ExtractFrustumCorners(const FMatrix& ViewProjection, FFrustumCorners& OutCorners);
+bool TryMakeWorldOBB(const FBox& LocalBounds, const FMatrix& WorldMatrix, FOrientedBox& OutOBB);
+bool IsOBBInFrustumSAT(const FOrientedBox& OBB, const FFrustumPlanes& Frustum, const FFrustumCorners& Corners);
 
 enum class EFrustumTest : uint8 { Outside, Intersect, Inside };
 

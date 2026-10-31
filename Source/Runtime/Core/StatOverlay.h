@@ -30,6 +30,7 @@ struct FDecalStats
 {
 	int32 NumTotalDecals = 0;
 	int32 NumHiddenDecals = 0;
+	int32 NumOBBCulledDecals = 0;
 	int32 NumFrustumCulledDecals = 0;
 	int32 NumInFrustumDecals = 0;
 	int32 NumDrawCalls = 0;

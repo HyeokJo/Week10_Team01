@@ -585,6 +585,7 @@ void FViewportsPanel::DrawStatOverlay(ImDrawList* DrawList, const ImVec2& ViewMi
 		const FDecalStats& Decal = FStatOverlay::GetDecalStats();
 		Lines.Add({std::format("  Total          {}", Decal.NumTotalDecals), ValueColor});
 		Lines.Add({std::format("  Hidden         {}", Decal.NumHiddenDecals), ValueColor});
+		Lines.Add({std::format("  OBB SAT Culled {}", Decal.NumOBBCulledDecals), ValueColor});
 		Lines.Add({std::format("  Frustum Culled {}", Decal.NumFrustumCulledDecals), ValueColor});
 		Lines.Add({std::format("  In Frustum     {}", Decal.NumInFrustumDecals), ValueColor});
 		Lines.Add({std::format("  Draw Calls     {}", Decal.NumDrawCalls), ValueColor});
