@@ -322,7 +322,7 @@ void FSceneRenderer::RenderDepthPass(const FSceneView& SceneView, const FRenderi
 
 void FSceneRenderer::RenderDecalPass(const FSceneView& SceneView, const FSceneRenderSettings& Settings, const UWorld& ViewWorld)
 {
-	if(!DecalRenderer || Settings.bDepthView || Settings.bVisualizeTileLightCount)
+	if(!Settings.bDrawDecals || !DecalRenderer || Settings.bDepthView || Settings.bVisualizeTileLightCount)
 		return;
 
 	const EViewMode ViewMode = SceneView.RenderMode.ViewMode;
