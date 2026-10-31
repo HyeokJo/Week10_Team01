@@ -6,6 +6,7 @@
 
 class FScene;
 class UDecalComponent;
+class UTexture2D;
 
 class FDecalSceneProxy
 {
@@ -25,6 +26,8 @@ public:
 	float GetOpacity() const { return Opacity; }
 	bool IsHiddenInGame() const { return bHiddenInGame; }
 
+	UTexture2D* GetTexture() const { return Texture; }
+
 private:
 	friend class FScene;
 
@@ -39,4 +42,6 @@ private:
 	FString TexturePath;
 	float Opacity = 1.0f;
 	bool bHiddenInGame = false;
+
+	UTexture2D* Texture = nullptr;
 };

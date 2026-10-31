@@ -1,6 +1,7 @@
 #include "EnginePCH.h"
 #include "Component/DecalComponent.h"
 #include "DecalSceneProxy.h"
+#include "Asset/AssetManager.h"
 
 void FDecalSceneProxy::UpdateFromComponent()
 {
@@ -8,7 +9,13 @@ void FDecalSceneProxy::UpdateFromComponent()
 	WorldToDecal = DecalToWorld.Inverse();
 
 	DecalSize = Component->GetDecalSize();
-	TexturePath = Component->GetTexturePath();
+	const FString& NewTexturePath = Component->GetTexturePath();
+
+	if (TexturePath != NewTexturePath || !Texture)
+	{
+		TexturePath = NewTexturePath;
+		Texture = TexturePath.empty() ? nullptr : UAssetManager::Get().LoadTexture(TexturePath);
+	}
 	Opacity = Component->GetOpacity();
 	bHiddenInGame = Component->IsHiddenInGame();
 

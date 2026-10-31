@@ -10,6 +10,9 @@ cbuffer DecalConstants : register(b0)
     float Opacity;
 };
 
+Texture2D DecalTexture : register(t0);
+SamplerState DecalSampler : register(s0);
+
 struct VSInput
 {
     float3 Position : POSITION;
@@ -42,5 +45,9 @@ float4 mainPS(PSInput input) : SV_TARGET
     
     float2 DecalUV = input.DecalPosition.yz * float2(0.5f, -0.5f) + 0.5f;
     
-    return float4(DecalUV, 0.0f, Opacity);
+    float4 Color = DecalTexture.Sample(DecalSampler, DecalUV);
+    
+    Color.a *= Opacity;
+    
+    return Color;
 }

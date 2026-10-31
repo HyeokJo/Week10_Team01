@@ -6,6 +6,7 @@
 #include "Render/RenderCommand.h"
 #include "Render/RenderPacket.h"
 #include "Render/RenderResourceManager.h"
+#include "Render/Texture2D.h"
 
 bool FDecalRenderer::Init()
 {
@@ -44,7 +45,9 @@ bool FDecalRenderer::Init()
 
 void FDecalRenderer::OnRender(const FRenderPacket& Receiver, const FDecalSceneProxy& Decal, const FMatrix& ViewProjection)
 {
-	if(!bReady || !Receiver.Mesh || Decal.GetOpacity() <= 0.0f)
+	UTexture2D* DecalTexture = Decal.GetTexture();
+
+	if(!bReady || !Receiver.Mesh || Decal.GetOpacity() <= 0.0f || !DecalTexture)
 	{
 		return;
 	}
@@ -61,6 +64,9 @@ void FDecalRenderer::OnRender(const FRenderPacket& Receiver, const FDecalScenePr
 	RenderCommand::BindMesh(Receiver.Mesh, Receiver.LODIndex);
 	RenderCommand::BindPipelineState(PipelineState);
 
+	RenderCommand::BindShaderResource(0, DecalTexture, EShaderBindFlagBits::Pixel);
+	RenderCommand::BindSamplerState(0, ESamplerState::LinearClamp, EShaderBindFlagBits::Pixel);
+
 	RenderCommand::UpdateBufferData(ConstantBuffer.get(), &Constants, sizeof(Constants));
 
 	RenderCommand::BindConstantBuffer(0, ConstantBuffer.get(), EShaderBindFlagBits::Vertex | EShaderBindFlagBits::Pixel);
@@ -68,4 +74,6 @@ void FDecalRenderer::OnRender(const FRenderPacket& Receiver, const FDecalScenePr
 	const uint32 IndexCount = Receiver.IndexCount != 0 ? Receiver.IndexCount : Receiver.Mesh->GetIndexBuffer(Receiver.LODIndex)->GetIndexCount();
 	
 	RenderCommand::DrawIndexed(IndexCount, Receiver.StartIndex);
+
+	RenderCommand::UnbindShaderResource(0, EShaderBindFlagBits::Pixel);
 }

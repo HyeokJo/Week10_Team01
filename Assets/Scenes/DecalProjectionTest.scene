@@ -1,0 +1,865 @@
+{
+    "Version": 4,
+    "World": {
+        "PersistentLevel": {
+            "Actors": [
+                {
+                    "Class": "AStaticMeshActor",
+                    "Components": [
+                        {
+                            "Class": "USceneComponent",
+                            "Name": "DefaultSceneRoot",
+                            "Parent": "",
+                            "Properties": {
+                                "Transform": {
+                                    "Location": {
+                                        "X": 2,
+                                        "Y": 0,
+                                        "Z": 2.5
+                                    },
+                                    "Rotation": {
+                                        "Pitch": 0,
+                                        "Yaw": 0,
+                                        "Roll": 0
+                                    },
+                                    "Scale": {
+                                        "X": 0.4,
+                                        "Y": 10,
+                                        "Z": 5
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UStaticMeshComponent",
+                            "Name": "UStaticMeshComponent",
+                            "OverrideMaterials": [
+                                {
+                                    "Base": "DefaultMaterial",
+                                    "Instance": {
+                                        "BaseColor": {
+                                            "R": 0.055,
+                                            "G": 0.075,
+                                            "B": 0.11,
+                                            "A": 1.0
+                                        },
+                                        "BlendState": "Opaque",
+                                        "Properties": {},
+                                        "SamplerState": "LinearClamp",
+                                        "Shininess": 16.0,
+                                        "SpecularColor": {
+                                            "R": 0.08,
+                                            "G": 0.08,
+                                            "B": 0.08,
+                                            "A": 1.0
+                                        },
+                                        "Textures": [
+                                            "WhiteTexture"
+                                        ],
+                                        "UVScrollSpeed": [
+                                            0.0,
+                                            0.0
+                                        ],
+                                        "bFlipNormalGreen": false
+                                    }
+                                }
+                            ],
+                            "Parent": "DefaultSceneRoot",
+                            "Properties": {
+                                "ShowBeginOverlapLog": false,
+                                "ShowEndOverlapLog": false,
+                                "ShowHitLog": false,
+                                "StaticMesh": "Cube",
+                                "Transform": {
+                                    "Location": {
+                                        "X": 0,
+                                        "Y": 0,
+                                        "Z": 0
+                                    },
+                                    "Rotation": {
+                                        "Pitch": 0,
+                                        "Yaw": 0,
+                                        "Roll": 0
+                                    },
+                                    "Scale": {
+                                        "X": 1,
+                                        "Y": 1,
+                                        "Z": 1
+                                    }
+                                },
+                                "bBlockComponet": false,
+                                "bCastShadow": true,
+                                "bGenerateOverlapEvents": true,
+                                "bReceiveShadow": true,
+                                "bVisible": true
+                            }
+                        }
+                    ],
+                    "Name": "Test_Wall",
+                    "Properties": {},
+                    "RootComponent": "DefaultSceneRoot"
+                },
+                {
+                    "Class": "AStaticMeshActor",
+                    "Components": [
+                        {
+                            "Class": "USceneComponent",
+                            "Name": "DefaultSceneRoot",
+                            "Parent": "",
+                            "Properties": {
+                                "Transform": {
+                                    "Location": {
+                                        "X": -1,
+                                        "Y": 0,
+                                        "Z": -0.15
+                                    },
+                                    "Rotation": {
+                                        "Pitch": 0,
+                                        "Yaw": 0,
+                                        "Roll": 0
+                                    },
+                                    "Scale": {
+                                        "X": 8,
+                                        "Y": 12,
+                                        "Z": 0.3
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UStaticMeshComponent",
+                            "Name": "UStaticMeshComponent",
+                            "OverrideMaterials": [
+                                {
+                                    "Base": "DefaultMaterial",
+                                    "Instance": {
+                                        "BaseColor": {
+                                            "R": 0.11,
+                                            "G": 0.13,
+                                            "B": 0.16,
+                                            "A": 1.0
+                                        },
+                                        "BlendState": "Opaque",
+                                        "Properties": {},
+                                        "SamplerState": "LinearClamp",
+                                        "Shininess": 16.0,
+                                        "SpecularColor": {
+                                            "R": 0.08,
+                                            "G": 0.08,
+                                            "B": 0.08,
+                                            "A": 1.0
+                                        },
+                                        "Textures": [
+                                            "WhiteTexture"
+                                        ],
+                                        "UVScrollSpeed": [
+                                            0.0,
+                                            0.0
+                                        ],
+                                        "bFlipNormalGreen": false
+                                    }
+                                }
+                            ],
+                            "Parent": "DefaultSceneRoot",
+                            "Properties": {
+                                "ShowBeginOverlapLog": false,
+                                "ShowEndOverlapLog": false,
+                                "ShowHitLog": false,
+                                "StaticMesh": "Cube",
+                                "Transform": {
+                                    "Location": {
+                                        "X": 0,
+                                        "Y": 0,
+                                        "Z": 0
+                                    },
+                                    "Rotation": {
+                                        "Pitch": 0,
+                                        "Yaw": 0,
+                                        "Roll": 0
+                                    },
+                                    "Scale": {
+                                        "X": 1,
+                                        "Y": 1,
+                                        "Z": 1
+                                    }
+                                },
+                                "bBlockComponet": false,
+                                "bCastShadow": true,
+                                "bGenerateOverlapEvents": true,
+                                "bReceiveShadow": true,
+                                "bVisible": true
+                            }
+                        }
+                    ],
+                    "Name": "Test_Floor",
+                    "Properties": {},
+                    "RootComponent": "DefaultSceneRoot"
+                },
+                {
+                    "Class": "AStaticMeshActor",
+                    "Components": [
+                        {
+                            "Class": "USceneComponent",
+                            "Name": "DefaultSceneRoot",
+                            "Parent": "",
+                            "Properties": {
+                                "Transform": {
+                                    "Location": {
+                                        "X": -1,
+                                        "Y": 2.4,
+                                        "Z": 1
+                                    },
+                                    "Rotation": {
+                                        "Pitch": 0,
+                                        "Yaw": 0,
+                                        "Roll": 0
+                                    },
+                                    "Scale": {
+                                        "X": 1,
+                                        "Y": 1,
+                                        "Z": 1
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UStaticMeshComponent",
+                            "Name": "UStaticMeshComponent",
+                            "OverrideMaterials": [
+                                {
+                                    "Base": "DefaultMaterial",
+                                    "Instance": {
+                                        "BaseColor": {
+                                            "R": 0.18,
+                                            "G": 0.2,
+                                            "B": 0.24,
+                                            "A": 1.0
+                                        },
+                                        "BlendState": "Opaque",
+                                        "Properties": {},
+                                        "SamplerState": "LinearClamp",
+                                        "Shininess": 16.0,
+                                        "SpecularColor": {
+                                            "R": 0.08,
+                                            "G": 0.08,
+                                            "B": 0.08,
+                                            "A": 1.0
+                                        },
+                                        "Textures": [
+                                            "WhiteTexture"
+                                        ],
+                                        "UVScrollSpeed": [
+                                            0.0,
+                                            0.0
+                                        ],
+                                        "bFlipNormalGreen": false
+                                    }
+                                }
+                            ],
+                            "Parent": "DefaultSceneRoot",
+                            "Properties": {
+                                "ShowBeginOverlapLog": false,
+                                "ShowEndOverlapLog": false,
+                                "ShowHitLog": false,
+                                "StaticMesh": "Sphere",
+                                "Transform": {
+                                    "Location": {
+                                        "X": 0,
+                                        "Y": 0,
+                                        "Z": 0
+                                    },
+                                    "Rotation": {
+                                        "Pitch": 0,
+                                        "Yaw": 0,
+                                        "Roll": 0
+                                    },
+                                    "Scale": {
+                                        "X": 1,
+                                        "Y": 1,
+                                        "Z": 1
+                                    }
+                                },
+                                "bBlockComponet": false,
+                                "bCastShadow": true,
+                                "bGenerateOverlapEvents": true,
+                                "bReceiveShadow": true,
+                                "bVisible": true
+                            }
+                        }
+                    ],
+                    "Name": "Test_CurvedSphere",
+                    "Properties": {},
+                    "RootComponent": "DefaultSceneRoot"
+                },
+                {
+                    "Class": "ADecalActor",
+                    "Components": [
+                        {
+                            "Class": "USceneComponent",
+                            "Name": "DefaultSceneRoot",
+                            "Parent": "",
+                            "Properties": {
+                                "Transform": {
+                                    "Location": {
+                                        "X": 1.75,
+                                        "Y": -3.2,
+                                        "Z": 2.7
+                                    },
+                                    "Rotation": {
+                                        "Pitch": 0,
+                                        "Yaw": 0,
+                                        "Roll": 0
+                                    },
+                                    "Scale": {
+                                        "X": 1,
+                                        "Y": 1,
+                                        "Z": 1
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UDecalComponent",
+                            "Name": "DecalComponent",
+                            "Parent": "DefaultSceneRoot",
+                            "Properties": {
+                                "DecalSize": {
+                                    "X": 0.3,
+                                    "Y": 1.0,
+                                    "Z": 1.0
+                                },
+                                "Opacity": 1.0,
+                                "TexturePath": "Assets/Textures/DecalProjectionTest.png",
+                                "Transform": {
+                                    "Location": {
+                                        "X": 0,
+                                        "Y": 0,
+                                        "Z": 0
+                                    },
+                                    "Rotation": {
+                                        "Pitch": 0,
+                                        "Yaw": 0,
+                                        "Roll": 0
+                                    },
+                                    "Scale": {
+                                        "X": 1,
+                                        "Y": 1,
+                                        "Z": 1
+                                    }
+                                }
+                            }
+                        }
+                    ],
+                    "Name": "Decal_Wall_01_Opacity100",
+                    "Properties": {},
+                    "RootComponent": "DefaultSceneRoot"
+                },
+                {
+                    "Class": "ADecalActor",
+                    "Components": [
+                        {
+                            "Class": "USceneComponent",
+                            "Name": "DefaultSceneRoot",
+                            "Parent": "",
+                            "Properties": {
+                                "Transform": {
+                                    "Location": {
+                                        "X": 1.75,
+                                        "Y": 0,
+                                        "Z": 2.7
+                                    },
+                                    "Rotation": {
+                                        "Pitch": 0,
+                                        "Yaw": 0,
+                                        "Roll": 25
+                                    },
+                                    "Scale": {
+                                        "X": 1,
+                                        "Y": 1,
+                                        "Z": 1
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UDecalComponent",
+                            "Name": "DecalComponent",
+                            "Parent": "DefaultSceneRoot",
+                            "Properties": {
+                                "DecalSize": {
+                                    "X": 0.3,
+                                    "Y": 1.0,
+                                    "Z": 1.0
+                                },
+                                "Opacity": 1.0,
+                                "TexturePath": "Assets/Textures/DecalProjectionTest.png",
+                                "Transform": {
+                                    "Location": {
+                                        "X": 0,
+                                        "Y": 0,
+                                        "Z": 0
+                                    },
+                                    "Rotation": {
+                                        "Pitch": 0,
+                                        "Yaw": 0,
+                                        "Roll": 0
+                                    },
+                                    "Scale": {
+                                        "X": 1,
+                                        "Y": 1,
+                                        "Z": 1
+                                    }
+                                }
+                            }
+                        }
+                    ],
+                    "Name": "Decal_Wall_02_Roll25",
+                    "Properties": {},
+                    "RootComponent": "DefaultSceneRoot"
+                },
+                {
+                    "Class": "ADecalActor",
+                    "Components": [
+                        {
+                            "Class": "USceneComponent",
+                            "Name": "DefaultSceneRoot",
+                            "Parent": "",
+                            "Properties": {
+                                "Transform": {
+                                    "Location": {
+                                        "X": 1.75,
+                                        "Y": 3.2,
+                                        "Z": 2.7
+                                    },
+                                    "Rotation": {
+                                        "Pitch": 0,
+                                        "Yaw": 0,
+                                        "Roll": 0
+                                    },
+                                    "Scale": {
+                                        "X": 1,
+                                        "Y": 1,
+                                        "Z": 1
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UDecalComponent",
+                            "Name": "DecalComponent",
+                            "Parent": "DefaultSceneRoot",
+                            "Properties": {
+                                "DecalSize": {
+                                    "X": 0.3,
+                                    "Y": 1.0,
+                                    "Z": 1.0
+                                },
+                                "Opacity": 0.3,
+                                "TexturePath": "Assets/Textures/DecalProjectionTest.png",
+                                "Transform": {
+                                    "Location": {
+                                        "X": 0,
+                                        "Y": 0,
+                                        "Z": 0
+                                    },
+                                    "Rotation": {
+                                        "Pitch": 0,
+                                        "Yaw": 0,
+                                        "Roll": 0
+                                    },
+                                    "Scale": {
+                                        "X": 1,
+                                        "Y": 1,
+                                        "Z": 1
+                                    }
+                                }
+                            }
+                        }
+                    ],
+                    "Name": "Decal_Wall_03_Opacity30",
+                    "Properties": {},
+                    "RootComponent": "DefaultSceneRoot"
+                },
+                {
+                    "Class": "ADecalActor",
+                    "Components": [
+                        {
+                            "Class": "USceneComponent",
+                            "Name": "DefaultSceneRoot",
+                            "Parent": "",
+                            "Properties": {
+                                "Transform": {
+                                    "Location": {
+                                        "X": -1.5,
+                                        "Y": -2.4,
+                                        "Z": 0.02
+                                    },
+                                    "Rotation": {
+                                        "Pitch": 90,
+                                        "Yaw": 0,
+                                        "Roll": 0
+                                    },
+                                    "Scale": {
+                                        "X": 1,
+                                        "Y": 1,
+                                        "Z": 1
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UDecalComponent",
+                            "Name": "DecalComponent",
+                            "Parent": "DefaultSceneRoot",
+                            "Properties": {
+                                "DecalSize": {
+                                    "X": 0.2,
+                                    "Y": 1.0,
+                                    "Z": 1.0
+                                },
+                                "Opacity": 1.0,
+                                "TexturePath": "Assets/Textures/DecalProjectionTest.png",
+                                "Transform": {
+                                    "Location": {
+                                        "X": 0,
+                                        "Y": 0,
+                                        "Z": 0
+                                    },
+                                    "Rotation": {
+                                        "Pitch": 0,
+                                        "Yaw": 0,
+                                        "Roll": 0
+                                    },
+                                    "Scale": {
+                                        "X": 1,
+                                        "Y": 1,
+                                        "Z": 1
+                                    }
+                                }
+                            }
+                        }
+                    ],
+                    "Name": "Decal_Floor_Pitch90",
+                    "Properties": {},
+                    "RootComponent": "DefaultSceneRoot"
+                },
+                {
+                    "Class": "ADecalActor",
+                    "Components": [
+                        {
+                            "Class": "USceneComponent",
+                            "Name": "DefaultSceneRoot",
+                            "Parent": "",
+                            "Properties": {
+                                "Transform": {
+                                    "Location": {
+                                        "X": -1.6,
+                                        "Y": 2.4,
+                                        "Z": 1.0
+                                    },
+                                    "Rotation": {
+                                        "Pitch": 0,
+                                        "Yaw": 0,
+                                        "Roll": 0
+                                    },
+                                    "Scale": {
+                                        "X": 1,
+                                        "Y": 1,
+                                        "Z": 1
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UDecalComponent",
+                            "Name": "DecalComponent",
+                            "Parent": "DefaultSceneRoot",
+                            "Properties": {
+                                "DecalSize": {
+                                    "X": 0.9,
+                                    "Y": 0.85,
+                                    "Z": 0.85
+                                },
+                                "Opacity": 1.0,
+                                "TexturePath": "Assets/Textures/DecalProjectionTest.png",
+                                "Transform": {
+                                    "Location": {
+                                        "X": 0,
+                                        "Y": 0,
+                                        "Z": 0
+                                    },
+                                    "Rotation": {
+                                        "Pitch": 0,
+                                        "Yaw": 0,
+                                        "Roll": 0
+                                    },
+                                    "Scale": {
+                                        "X": 1,
+                                        "Y": 1,
+                                        "Z": 1
+                                    }
+                                }
+                            }
+                        }
+                    ],
+                    "Name": "Decal_Sphere_Projection",
+                    "Properties": {},
+                    "RootComponent": "DefaultSceneRoot"
+                },
+                {
+                    "Class": "ADirectionalLightActor",
+                    "Components": [
+                        {
+                            "Class": "USceneComponent",
+                            "Name": "DefaultSceneRoot",
+                            "Parent": "",
+                            "Properties": {
+                                "Transform": {
+                                    "Location": {
+                                        "X": 0.0,
+                                        "Y": 0.0,
+                                        "Z": 0.0
+                                    },
+                                    "Rotation": {
+                                        "Pitch": 0.0,
+                                        "Roll": 0.0,
+                                        "Yaw": 0.0
+                                    },
+                                    "Scale": {
+                                        "X": 1.0,
+                                        "Y": 1.0,
+                                        "Z": 1.0
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UDirectionalLightComponent",
+                            "Name": "UDirectionalLightComponent",
+                            "Parent": "",
+                            "Properties": {
+                                "Intensity": 0.8,
+                                "LightColor": {
+                                    "A": 255,
+                                    "B": 255,
+                                    "G": 255,
+                                    "R": 255
+                                },
+                                "OrthoWidth": 2000.0,
+                                "ShadowBias": 0.0010000000474974513,
+                                "ShadowNormalBias": 2.0,
+                                "ShadowResolution": 2048,
+                                "Transform": {
+                                    "Location": {
+                                        "X": -5,
+                                        "Y": -4,
+                                        "Z": 7
+                                    },
+                                    "Rotation": {
+                                        "Pitch": 40,
+                                        "Yaw": 20,
+                                        "Roll": 0
+                                    },
+                                    "Scale": {
+                                        "X": 1,
+                                        "Y": 1,
+                                        "Z": 1
+                                    }
+                                },
+                                "bCastShadows": false,
+                                "bVisible": true
+                            }
+                        },
+                        {
+                            "Class": "UBillboardComponent",
+                            "Material": {
+                                "Base": "BillboardMaterial",
+                                "Instance": {
+                                    "BaseColor": {
+                                        "A": 1.0,
+                                        "B": 1.0,
+                                        "G": 1.0,
+                                        "R": 1.0
+                                    },
+                                    "BlendState": "AlphaBlend",
+                                    "Properties": {},
+                                    "SamplerState": "LinearClamp",
+                                    "Shininess": 32.0,
+                                    "SpecularColor": {
+                                        "A": 1.0,
+                                        "B": 0.5,
+                                        "G": 0.5,
+                                        "R": 0.5
+                                    },
+                                    "Textures": [
+                                        "Resources/Icons/S_LightDirectional.png"
+                                    ],
+                                    "UVScrollSpeed": [
+                                        0.0,
+                                        0.0
+                                    ],
+                                    "bFlipNormalGreen": false
+                                }
+                            },
+                            "Name": "UBillboardComponent",
+                            "Parent": "UDirectionalLightComponent",
+                            "Properties": {
+                                "ShowBeginOverlapLog": false,
+                                "ShowEndOverlapLog": false,
+                                "ShowHitLog": false,
+                                "Transform": {
+                                    "Location": {
+                                        "X": 0.0,
+                                        "Y": 0.0,
+                                        "Z": 0.0
+                                    },
+                                    "Rotation": {
+                                        "Pitch": 0.0,
+                                        "Roll": 0.0,
+                                        "Yaw": 0.0
+                                    },
+                                    "Scale": {
+                                        "X": 1.0,
+                                        "Y": 1.0,
+                                        "Z": 1.0
+                                    }
+                                },
+                                "bBlockComponet": false,
+                                "bCastShadow": true,
+                                "bGenerateOverlapEvents": true,
+                                "bReceiveShadow": true,
+                                "bVisible": true
+                            }
+                        }
+                    ],
+                    "Name": "Test_DirectionalLight",
+                    "Properties": {},
+                    "RootComponent": "UDirectionalLightComponent"
+                },
+                {
+                    "Class": "AAmbientLightActor",
+                    "Components": [
+                        {
+                            "Class": "USceneComponent",
+                            "Name": "DefaultSceneRoot",
+                            "Parent": "",
+                            "Properties": {
+                                "Transform": {
+                                    "Location": {
+                                        "X": 0.0,
+                                        "Y": 0.0,
+                                        "Z": 0.0
+                                    },
+                                    "Rotation": {
+                                        "Pitch": 0.0,
+                                        "Roll": 0.0,
+                                        "Yaw": 0.0
+                                    },
+                                    "Scale": {
+                                        "X": 1.0,
+                                        "Y": 1.0,
+                                        "Z": 1.0
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UAmbientLightComponent",
+                            "Name": "UAmbientLightComponent",
+                            "Parent": "",
+                            "Properties": {
+                                "Intensity": 0.5,
+                                "LightColor": {
+                                    "A": 255,
+                                    "B": 255,
+                                    "G": 255,
+                                    "R": 255
+                                },
+                                "Transform": {
+                                    "Location": {
+                                        "X": -5,
+                                        "Y": 5,
+                                        "Z": 6
+                                    },
+                                    "Rotation": {
+                                        "Pitch": 0,
+                                        "Yaw": 0,
+                                        "Roll": 0
+                                    },
+                                    "Scale": {
+                                        "X": 1,
+                                        "Y": 1,
+                                        "Z": 1
+                                    }
+                                },
+                                "bCastShadows": true,
+                                "bVisible": true
+                            }
+                        },
+                        {
+                            "Class": "UBillboardComponent",
+                            "Material": {
+                                "Base": "BillboardMaterial",
+                                "Instance": {
+                                    "BaseColor": {
+                                        "A": 1.0,
+                                        "B": 1.0,
+                                        "G": 1.0,
+                                        "R": 1.0
+                                    },
+                                    "BlendState": "AlphaBlend",
+                                    "Properties": {},
+                                    "SamplerState": "LinearClamp",
+                                    "Shininess": 32.0,
+                                    "SpecularColor": {
+                                        "A": 1.0,
+                                        "B": 0.5,
+                                        "G": 0.5,
+                                        "R": 0.5
+                                    },
+                                    "Textures": [
+                                        "Resources/Icons/SkyLight.png"
+                                    ],
+                                    "UVScrollSpeed": [
+                                        0.0,
+                                        0.0
+                                    ],
+                                    "bFlipNormalGreen": false
+                                }
+                            },
+                            "Name": "UBillboardComponent",
+                            "Parent": "UAmbientLightComponent",
+                            "Properties": {
+                                "Transform": {
+                                    "Location": {
+                                        "X": 0.0,
+                                        "Y": 0.0,
+                                        "Z": 0.0
+                                    },
+                                    "Rotation": {
+                                        "Pitch": 0.0,
+                                        "Roll": 0.0,
+                                        "Yaw": 0.0
+                                    },
+                                    "Scale": {
+                                        "X": 1.0,
+                                        "Y": 1.0,
+                                        "Z": 1.0
+                                    }
+                                },
+                                "bCastShadow": true,
+                                "bReceiveShadow": true,
+                                "bVisible": true
+                            }
+                        }
+                    ],
+                    "Properties": {},
+                    "Name": "Test_AmbientLight",
+                    "RootComponent": "UAmbientLightComponent"
+                }
+            ],
+            "Properties": {}
+        },
+        "Properties": {}
+    }
+}
