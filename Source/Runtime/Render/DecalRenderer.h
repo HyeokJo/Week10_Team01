@@ -16,8 +16,11 @@ struct FDecalConstants
     float Opacity;
 
     FLinearColor BaseColor;
+
+    float ProjectionEndFade;
+    FVector Padding;
 };
-static_assert(sizeof(FDecalConstants) == 160);
+static_assert(sizeof(FDecalConstants) == 176);
 
 class FDecalRenderer
 {

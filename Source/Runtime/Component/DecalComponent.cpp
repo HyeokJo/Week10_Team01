@@ -4,7 +4,7 @@
 #include "GameFramework/Actor.h"
 #include "Engine/World.h"
 #include "Engine/Scene.h"
-
+#include "Render/LineBatcher.h"
 UDecalComponent::UDecalComponent()
 {
 	PrimaryComponentTick.bCanEverTick = true;
@@ -79,6 +79,25 @@ void UDecalComponent::PostEditChangeProperty(const FProperty& Property)
 	SetOpacity(Opacity);
 	FadeInDuration = FMath::Max(FadeInDuration, 0.0f);
 	FadeOutDuration = FMath::Max(FadeOutDuration, 0.0f);
+}
+
+void UDecalComponent::DrawDebug(FLineBatcher* LineBatcher) const
+{
+	if (!LineBatcher)
+	{
+		return;
+	}
+	const FVector4 Color(0.1f, 0.85f, 1.0f, 1.0f);
+	LineBatcher->AddOrientedBox(CalcLocalBounds(), GetWorldMatrix(), Color);
+	const FMatrix World = GetWorldMatrix();
+	const FVector Forward = FVector(World[0][0], World[0][1], World[0][2]).GetSafeNormal();
+	const float HalfLength = DecalSize.X * std::fabs(GetWorldScale3D().X);
+	const FVector Start = GetWorldLocation() - Forward * HalfLength;
+	const float Length = HalfLength * 2.0f;
+	if (Length > 0.01f)
+	{
+		LineBatcher->AddArrow(Start, Forward, 2, 0.1f, std::min(2 * 0.1f, 12.0f), Color);
+	}
 }
 
 void UDecalComponent::Serialize(json& Handle, bool bIsLoading)

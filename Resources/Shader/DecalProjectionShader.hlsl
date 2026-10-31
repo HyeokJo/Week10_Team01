@@ -13,6 +13,9 @@ cbuffer DecalConstants : register(b0)
     float3 DecalSize;
     float Opacity;
     float4 BaseColor;
+    
+    float ProjectionEndFade;
+    float3 Padding;
 };
 
 struct PSInput
@@ -59,8 +62,15 @@ float4 mainPS(PSInput Input) : SV_TARGET
     float2 DecalUV = float2(LocalPosition.y / (DecalSize.y * 2.0f) + 0.5f, 0.5f - LocalPosition.z / (DecalSize.z * 2.0f));
 
     float4 Color = DecalTexture.Sample(DecalSampler, DecalUV);
+    float RangeT = saturate(LocalPosition.x / (DecalSize.x * 2.0f) + 0.5f);
+    float RangeFade = 1.0f;
+    if(ProjectionEndFade > 0.0001f)
+    {
+        float FadeStart = 1.0f - ProjectionEndFade;
+        RangeFade = 1.0f - smoothstep(FadeStart, 1.0f, RangeT);
+    }
     Color.rgb *= BaseColor.rgb;
-    Color.a *= saturate(Opacity) * saturate(BaseColor.a);
+    Color.a *= saturate(Opacity) * saturate(BaseColor.a) * RangeFade;
 
     if (Color.a <= 0.001f)
         discard;

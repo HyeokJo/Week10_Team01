@@ -39,6 +39,7 @@
 #include "GameFramework/PlayerController.h"
 
 #include "Component/ShapeComponent.h"
+#include "Component/DecalComponent.h"
 #include "Engine/GameViewportClient.h"
 
 namespace
@@ -727,6 +728,14 @@ void UEditorEngine::RenderOverlayPass(const int32 ViewIndex, UWorld& ViewWorld, 
 				continue;
 			if (Selection.IsSelected(Owner) || LocalLight->ShouldAlwaysDrawDebug())
 				LocalLight->DrawDebug(LineBatcher.get());
+		}
+		for (TObjectIterator<UDecalComponent> Decal; Decal; ++Decal)
+		{
+			AActor* Owner = Decal->GetOwner();
+			if (!Owner || Owner->GetWorld() != &ViewWorld)
+				continue;
+			if (Selection.IsSelected(Owner))
+				Decal->DrawDebug(LineBatcher.get());
 		}
 	}
 

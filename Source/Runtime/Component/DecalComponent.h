@@ -2,6 +2,9 @@
 
 #include "SceneComponent.h"
 #include "Render/Material.h"
+
+class FLineBatcher;
+
 class UDecalComponent : public USceneComponent
 {
 	DECLARE_CLASS(UDecalComponent, USceneComponent)
@@ -36,6 +39,12 @@ public:
 
 	virtual void PostEditChangeProperty(const FProperty& Property) override;
 
+	void DrawDebug(FLineBatcher* LineBatcher) const;
+
+	void SetProjectionEndFade(float InFade) { ProjectionEndFade = FMath::Clamp(InFade, 0.0f, 0.99f); }
+
+	float GetProjectionEndFade() const { return ProjectionEndFade; }
+
 	virtual void Serialize(json& Handle, bool bIsLoading) override;
 
 	using Super::Serialize;
@@ -58,4 +67,5 @@ private:
 	void StartFade(float TargetOpacity, float Duration);
 	void SetFadeTickEnabled(bool bEnable);
 	void MarkDecalBoundsDirty();
+	float ProjectionEndFade = 0.0f;
 };

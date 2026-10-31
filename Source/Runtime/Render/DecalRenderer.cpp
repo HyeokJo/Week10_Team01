@@ -50,6 +50,7 @@ bool FDecalRenderer::OnRender(FTexture2D* DepthTexture, const FMatrix& ViewProje
     Constants.DecalSize = Decal.GetDecalSize();
     Constants.Opacity = Decal.GetOpacity();
     Constants.BaseColor = Material->BaseColor;
+    Constants.ProjectionEndFade = Decal.GetProjectionEndFade();
 
     RenderCommand::BindPipelineState(PipelineState);
     RenderCommand::BindShaderResource(0, DepthTexture, EShaderBindFlagBits::Pixel);
