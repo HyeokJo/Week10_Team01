@@ -20,6 +20,37 @@ namespace
 		}
 		return UAssetManager::Get().LoadTexture(Path);
 	}
+	
+	const char* SamplerStateToString(ESamplerState State)
+	{
+		switch (State)
+		{
+		case ESamplerState::LinearClamp:
+			return "LinearClamp";
+		case ESamplerState::LinearWrap:
+			return "LinearWrap";
+		case ESamplerState::Point:
+			return "Point";
+		case ESamplerState::Comparison_Linear:
+			"Comparison_Linear";
+		
+		default:
+			return "LinearClamp";
+		}
+	}
+	ESamplerState SamplerStateFromString(const FString& State)
+	{
+		if (State == "LinearWrap")
+			return ESamplerState::LinearWrap;
+
+		if (State == "Point")
+			return ESamplerState::Point;
+
+		if (State == "Comparison_Linear")
+			return ESamplerState::Comparison_Linear;
+
+		return ESamplerState::LinearClamp;
+	}
 }
 
 UMaterial* UMaterial::CreateInstance(const UMaterial* Source)
@@ -91,7 +122,7 @@ json UMaterial::SaveMaterial(const UMaterial* Material)
 	Out["Shininess"] = Material->Shininess;
 	Out["SpecularColor"] = Material->SpecularColor;
 	Out["bFlipNormalGreen"] = Material->bFlipNormalGreen;
-	Out["SamplerState"] = Material->SamplerState == ESamplerState::LinearWrap ? "LinearWrap" : "LinearClamp";
+	Out["SamplerState"] = SamplerStateToString(Material->SamplerState);
 	Out["BlendState"] = Material->BlendState == EBlendState::AlphaBlend ? "AlphaBlend" : "Opaque";
 
 	json Textures = json::array();
@@ -163,7 +194,7 @@ UMaterial* UMaterial::LoadMaterial(const json& In)
 	if (In.contains("SamplerState"))
 	{
 		const FString State = In["SamplerState"].get<FString>();
-		Instance->SamplerState = State == "LinearWrap" ? ESamplerState::LinearWrap : ESamplerState::LinearClamp;
+		Instance->SamplerState = SamplerStateFromString(State);
 	}
 	if (In.contains("BlendState"))
 	{
@@ -238,10 +269,10 @@ void UMaterial::Serialize(FStructuredArchive::FRecord Record)
 		<< SA_VALUE("bFlipNormalGreen", bFlipNormalGreen);
 
 	// enum은 이름 문자열로 (UE 텍스트 포맷도 enum을 이름으로 쓴다)
-	FString Sampler = SamplerState == ESamplerState::LinearWrap ? "LinearWrap" : "LinearClamp";
+	FString Sampler = SamplerStateToString(SamplerState);
 	Record << SA_VALUE("SamplerState", Sampler);
 	if (Ar.IsLoading())
-		SamplerState = Sampler == "LinearWrap" ? ESamplerState::LinearWrap : ESamplerState::LinearClamp;
+		SamplerState = SamplerStateFromString(Sampler);
 
 	FString Blend = BlendState == EBlendState::AlphaBlend ? "AlphaBlend" : "Opaque";
 	Record << SA_VALUE("BlendState", Blend);

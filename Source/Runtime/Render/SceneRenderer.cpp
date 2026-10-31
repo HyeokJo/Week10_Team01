@@ -331,9 +331,26 @@ void FSceneRenderer::RenderDepthPass(const FSceneView& SceneView, const FRenderi
 void FSceneRenderer::RenderDecalPass(const FSceneView& SceneView, const FSceneRenderSettings& Settings, const UWorld& ViewWorld, const FRenderingInfo& SceneInfo, const FFrustumPlanes& FrustumPlanes)
 {
 	FDecalStats DecalStats{};
-
 	const TArray<UDecalComponent*>& Decals = ViewWorld.GetScene().GetDecalComponents();
 	DecalStats.NumTotalDecals = Decals.Num();
+	const bool bIsGameWorld = ViewWorld.GetWorldType() != EWorldType::Editor;
+	int32 NumVisibleDecals = 0;
+
+	for (UDecalComponent* Decal : Decals)
+	{
+		if (!Decal)
+		{
+			continue;
+		}
+
+		if (bIsGameWorld && Decal->IsHiddenInGame())
+		{
+			++DecalStats.NumHiddenDecals;
+			continue;
+		}
+
+		++NumVisibleDecals;
+	}
 
 	if (!Settings.bDrawPrimitives || Decals.IsEmpty())
 	{
@@ -352,41 +369,53 @@ void FSceneRenderer::RenderDecalPass(const FSceneView& SceneView, const FSceneRe
 
 	RenderCommand::BeginRenderPass(PassInfo);
 
-	for (UDecalComponent* Decal : Decals)
-	{
-		if (!Decal)
+	const auto ClassifyBounds = [&FrustumPlanes](const FBox& Bounds, uint32& PlaneMask)
 		{
-			continue;
-		}
+			switch (ClassifyBoxInFrustum(
+				Bounds, FrustumPlanes, PlaneMask))
+			{
+			case EFrustumTest::Outside:
+				return EBVHCullResult::Outside;
 
-		if (ViewWorld.GetWorldType() != EWorldType::Editor && Decal->IsHiddenInGame())
+			case EFrustumTest::Intersect:
+				return EBVHCullResult::Intersect;
+
+			case EFrustumTest::Inside:
+				return EBVHCullResult::Inside;
+			}
+
+			return EBVHCullResult::Outside;
+		};
+
+	ViewWorld.GetScene().GetDecalBVH().QueryCull(FrustumAllPlanesMask, ClassifyBounds, [&](UDecalComponent* Decal)
 		{
-			++DecalStats.NumHiddenDecals;
-			continue;
+			if (!Decal)
+			{
+				return;
+			}
+
+			if (bIsGameWorld && Decal->IsHiddenInGame())
+			{
+				return;
+			}
+
+			++DecalStats.NumInFrustumDecals;
+
+			if (DecalRenderer->OnRender(SceneInfo.DepthStencil.Texture, SceneView.ViewProjection, *Decal))
+			{
+				++DecalStats.NumDrawCalls;
+			}
 		}
+	);
 
-		const FBox Bounds = Decal->CalcBounds();
-		const FAABB WorldBounds = MakeWorldBounds(Bounds);
-
-		if (!IsAABBInFrustum(WorldBounds, FrustumPlanes))
-		{
-			++DecalStats.NumFrustumCulledDecals;
-			continue;
-		}
-
-		++DecalStats.NumInFrustumDecals;
-
-		if (DecalRenderer->OnRender(SceneInfo.DepthStencil.Texture, SceneView.ViewProjection, *Decal))
-		{
-			++DecalStats.NumDrawCalls;
-		}
-	}
+	DecalStats.NumFrustumCulledDecals = std::max(0, NumVisibleDecals - DecalStats.NumInFrustumDecals);
 
 	RenderCommand::EndRenderPass();
 
 	RenderCommand::UnbindShaderResource(0, EShaderBindFlagBits::Pixel);
 	RenderCommand::UnbindShaderResource(1, EShaderBindFlagBits::Pixel);
 	RenderCommand::UnbindShaderResource(2, EShaderBindFlagBits::Pixel);
+
 	FStatOverlay::SetDecalStats(DecalStats);
 }
 

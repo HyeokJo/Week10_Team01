@@ -11,6 +11,7 @@ class UActorComponent : public UObject
 	DECLARE_CLASS(UActorComponent, UObject)
 
 	REFLECT_START(ClassName)
+		PROPERTY(bHiddenInGame)
 	REFLECT_END()
 
 public:

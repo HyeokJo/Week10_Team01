@@ -1,6 +1,9 @@
 #include "EnginePCH.h"
 #include "DecalComponent.h"
 #include "Render/Material.h"
+#include "GameFramework/Actor.h"
+#include "Engine/World.h"
+#include "Engine/Scene.h"
 
 UDecalComponent::UDecalComponent()
 {
@@ -51,6 +54,7 @@ void UDecalComponent::SetDecalSize(const FVector& InSize)
 	DecalSize.X = FMath::Max(InSize.X, 0.01f);
 	DecalSize.Y = FMath::Max(InSize.Y, 0.01f);
 	DecalSize.Z = FMath::Max(InSize.Z, 0.01f);
+	MarkDecalBoundsDirty();
 }
 
 void UDecalComponent::SetOpacity(float InOpacity)
@@ -61,6 +65,12 @@ void UDecalComponent::SetOpacity(float InOpacity)
 FBox UDecalComponent::CalcLocalBounds() const
 {
 	return FBox{ -DecalSize, DecalSize };
+}
+
+void UDecalComponent::OnTransformDirty()
+{
+	Super::OnTransformDirty();
+	MarkDecalBoundsDirty();
 }
 
 void UDecalComponent::PostEditChangeProperty(const FProperty& Property)
@@ -132,6 +142,16 @@ void UDecalComponent::SetFadeTickEnabled(bool bEnable)
 	if (PrimaryComponentTick.IsTickFunctionRegistered())
 	{
 		PrimaryComponentTick.SetTickFunctionEnable(bEnable);
+	}
+}
+
+void UDecalComponent::MarkDecalBoundsDirty()
+{
+	AActor* Owner = GetOwner();
+	UWorld* World = Owner ? Owner->GetWorld() : nullptr;
+	if (World)
+	{
+		World->GetScene().MarkDecalDirty(this);
 	}
 }
 

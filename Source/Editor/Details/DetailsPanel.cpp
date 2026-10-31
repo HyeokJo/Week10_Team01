@@ -784,18 +784,30 @@ namespace
 					ImGui::TableSetColumnIndex(1);
 					ImGui::SetNextItemWidth(-1.0f);
 
-					const char* SamplerItems[] = { "Linear Clamp", "Linear Wrap" };
-					int SamplerIndex = Effective ? static_cast<int>(Effective->SamplerState) : static_cast<int>(ESamplerState::LinearClamp);
+					static constexpr ESamplerState SamplerStates[] = {ESamplerState::LinearClamp, ESamplerState::LinearWrap, ESamplerState::Point};
+					const char* SamplerItems[] = {"Linear Clamp", "Linear Wrap", "Point"};
+					int SamplerIndex = 0;
+					if (Effective)
+					{
+						for (int i = 0; i < IM_ARRAYSIZE(SamplerStates); ++i)
+						{
+							if (Effective->SamplerState == SamplerStates[i])
+							{
+								SamplerIndex = i;
+								break;
+							}
+						}
+					}
 					if (ImGui::BeginCombo("##SamplerState", SamplerItems[SamplerIndex]))
 					{
-						for (int i = 0; i < static_cast<int>(ESamplerState::Count); ++i)
+						for (int i = 0; i < IM_ARRAYSIZE(SamplerItems); ++i)
 						{
 							if (ImGui::Selectable(SamplerItems[i], SamplerIndex == i))
 							{
 								Override = EnsureMaterialOverride(MeshComponent, Slot, Effective, Override);
 								if (Override)
 								{
-									Override->SamplerState = static_cast<ESamplerState>(i);
+									Override->SamplerState = SamplerStates[i];
 									Effective = Override;
 								}
 							}
@@ -1013,16 +1025,17 @@ namespace
 			ImGui::TableSetColumnIndex(1);
 			ImGui::SetNextItemWidth(-1.0f);
 
-			const char* SamplerItems[] =
+			static constexpr ESamplerState SamplerStates[] = {ESamplerState::LinearClamp, ESamplerState::LinearWrap, ESamplerState::Point};
+			const char* SamplerItems[] = {"Linear Clamp", "Linear Wrap", "Point"};
+			int SamplerIndex = 0;
+			for (int i = 0; i < IM_ARRAYSIZE(SamplerStates); ++i)
 			{
-				"Linear Clamp",
-				"Linear Wrap",
-				"Point",
-				"Comparison Linear"
-			};
-
-			int SamplerIndex = static_cast<int>(Effective->SamplerState);
-			SamplerIndex = std::clamp(SamplerIndex, 0, IM_ARRAYSIZE(SamplerItems) - 1);
+				if (Effective->SamplerState == SamplerStates[i])
+				{
+					SamplerIndex = i;
+					break;
+				}
+			}
 
 			if (ImGui::BeginCombo("##DecalSampler", SamplerItems[SamplerIndex]))
 			{
@@ -1030,20 +1043,17 @@ namespace
 				{
 					if (ImGui::Selectable(SamplerItems[i], SamplerIndex == i))
 					{
-						UMaterial* Instance =
-							EnsureDecalMaterialInstance(Decal, Effective);
+						UMaterial* Instance = EnsureDecalMaterialInstance(Decal, Effective);
 
 						if (Instance)
 						{
-							Instance->SamplerState = static_cast<ESamplerState>(i);
+							Instance->SamplerState = SamplerStates[i];
 							Effective = Instance;
 						}
 					}
 				}
-
 				ImGui::EndCombo();
 			}
-
 			ImGui::EndTable();
 		}
 

@@ -2,7 +2,10 @@
 #include "Scene.h"
 #include "LightSceneProxy.h"
 #include "Render/ColorWorkflow.h"
-#include <Core/StatOverlay.h>
+#include "Component/DecalComponent.h"
+#include "Core/StatOverlay.h"
+
+FScene::FScene() : DecalBVH([](UDecalComponent* Decal) {return Decal->CalcBounds();}) {}
 
 void FScene::AddPrimitive(UPrimitiveComponent* Component)
 {
@@ -215,6 +218,7 @@ void FScene::AddDecal(UDecalComponent* Component)
 		return;
 	}
 	DecalComponents.Add(Component);
+	bDecalElementListChanged = true;
 }
 
 void FScene::RemoveDecal(UDecalComponent* Component)
@@ -227,12 +231,26 @@ void FScene::RemoveDecal(UDecalComponent* Component)
 	if (Index != INDEX_NONE)
 	{
 		DecalComponents.RemoveAt(Index);
+		bDecalElementListChanged = true;
 	}
 }
 
 void FScene::RemoveAllDecals()
 {
 	DecalComponents.Reset();
+	DecalBVH.Clear();
+
+	bDecalElementListChanged = false;
+	bDecalBoundsChanged = false;
+}
+
+void FScene::MarkDecalDirty(UDecalComponent* Component)
+{
+	if (!Component || DecalComponents.Find(Component) == INDEX_NONE)
+	{
+		return;
+	}
+	bDecalBoundsChanged = true;
 }
 
 void FScene::UpdateAllTransforms()
@@ -294,6 +312,19 @@ void FScene::UpdateAllTransforms()
 	else if (bAnyMoved)
 	{
 		BVH.Refit();
+	}
+
+	if (bDecalElementListChanged)
+	{
+		BuildDecalBVH();
+
+		bDecalElementListChanged = false;
+		bDecalBoundsChanged = false;
+	}
+	else if (bDecalBoundsChanged)
+	{
+		DecalBVH.Refit();
+		bDecalBoundsChanged = false;
 	}
 }
 
@@ -537,5 +568,20 @@ void FScene::BuildStructuredLightAndShadowData(TArray<FPointLightInfo>& OutPoint
 		}
 		}
 	}
+}
+
+void FScene::BuildDecalBVH()
+{
+	TArray<UDecalComponent*> Elements;
+	Elements.Reserve(DecalComponents.Num());
+
+	for (UDecalComponent* Decal : DecalComponents)
+	{
+		if (Decal)
+		{
+			Elements.Add(Decal);
+		}
+	}
+	DecalBVH.Build(std::span(Elements.GetData(), Elements.Num()));
 }
 

@@ -31,6 +31,8 @@ public:
 	void SetDecalMaterial(UMaterial* InMaterial) { DecalMaterial = InMaterial; }
 
 	virtual FBox CalcLocalBounds() const override;
+	
+	virtual void OnTransformDirty() override;
 
 	virtual void PostEditChangeProperty(const FProperty& Property) override;
 
@@ -55,4 +57,5 @@ protected:
 private:
 	void StartFade(float TargetOpacity, float Duration);
 	void SetFadeTickEnabled(bool bEnable);
+	void MarkDecalBoundsDirty();
 };
