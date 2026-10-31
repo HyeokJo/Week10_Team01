@@ -911,7 +911,7 @@ float4 mainPS(FPSInput Input) : SV_TARGET
     float4 TextureColor = AlbedoTexture.Sample(AlbedoSampler, Input.UV + UVScrollOffset);
     float4 SurfaceColor = TextureColor * BaseColor;
 
-    float Albedo = SurfaceColor.rgb;
+    float3 Albedo = SurfaceColor.rgb;
     float Alpha = bOpaque ? 1.0f : SurfaceColor.a;
     if(bEnableDecalBaseColor != 0u)
     {
