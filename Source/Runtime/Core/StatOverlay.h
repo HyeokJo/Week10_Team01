@@ -34,6 +34,7 @@ struct FDecalStats
 	int32 NumFrustumCulledDecals = 0;
 	int32 NumInFrustumDecals = 0;
 	int32 NumDrawCalls = 0;
+	double CpuPassTimeMs = 0.0;
 };
 
 DEFINE_ENUM_OPERATORS(EStatFlags)

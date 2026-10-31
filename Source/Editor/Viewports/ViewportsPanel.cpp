@@ -589,6 +589,7 @@ void FViewportsPanel::DrawStatOverlay(ImDrawList* DrawList, const ImVec2& ViewMi
 		Lines.Add({std::format("  Frustum Culled {}", Decal.NumFrustumCulledDecals), ValueColor});
 		Lines.Add({std::format("  In Frustum     {}", Decal.NumInFrustumDecals), ValueColor});
 		Lines.Add({std::format("  Draw Calls     {}", Decal.NumDrawCalls), ValueColor});
+		Lines.Add({std::format("  CPU Pass Time  {:.3f} ms", Decal.CpuPassTimeMs), ValueColor});
 	}
 
 	struct FProfileStatLine

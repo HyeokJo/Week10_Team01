@@ -20,6 +20,7 @@
 #include "DecalRenderer.h"
 #include "Component/DecalComponent.h"
 #include "Core/StatOverlay.h"
+#include "Core/Windows/WindowsPlatformTime.h"
 FSceneRenderer::FSceneRenderer() = default;
 
 FSceneRenderer::~FSceneRenderer() = default;
@@ -330,7 +331,15 @@ void FSceneRenderer::RenderDepthPass(const FSceneView& SceneView, const FRenderi
 
 void FSceneRenderer::RenderDecalPass(const FSceneView& SceneView, const FSceneRenderSettings& Settings, const UWorld& ViewWorld, const FRenderingInfo& SceneInfo, const FFrustumPlanes& FrustumPlanes)
 {
+	const uint64 StartCycles = FPlatformTime::GetCycles64();
+
 	FDecalStats DecalStats{};
+
+	const auto UpdatePassTime = [&](){
+		const uint64 ElapsedCycles = FPlatformTime::GetCycles64() - StartCycles;
+		DecalStats.CpuPassTimeMs = FPlatformTime::ToMilliseconds64(ElapsedCycles);
+		};
+
 	const TArray<UDecalComponent*>& Decals = ViewWorld.GetScene().GetDecalComponents();
 	DecalStats.NumTotalDecals = Decals.Num();
 	const bool bIsGameWorld = ViewWorld.GetWorldType() != EWorldType::Editor;
@@ -354,6 +363,7 @@ void FSceneRenderer::RenderDecalPass(const FSceneView& SceneView, const FSceneRe
 
 	if (!Settings.bDrawPrimitives || Decals.IsEmpty())
 	{
+		UpdatePassTime();
 		FStatOverlay::SetDecalStats(DecalStats);
 		return;
 	}
@@ -429,6 +439,7 @@ void FSceneRenderer::RenderDecalPass(const FSceneView& SceneView, const FSceneRe
 	RenderCommand::UnbindShaderResource(1, EShaderBindFlagBits::Pixel);
 	RenderCommand::UnbindShaderResource(2, EShaderBindFlagBits::Pixel);
 
+	UpdatePassTime();
 	FStatOverlay::SetDecalStats(DecalStats);
 }
 

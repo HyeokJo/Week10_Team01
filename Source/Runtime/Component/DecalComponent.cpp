@@ -35,7 +35,6 @@ void UDecalComponent::TickComponent(float DeltaTime)
 		FadeOpacity = FadeTargetOpacity;
 		bIsFading = false;
 		SetFadeTickEnabled(false);
-		FadeOut();
 	}
 }
 
