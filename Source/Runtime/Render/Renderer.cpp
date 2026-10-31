@@ -155,7 +155,7 @@ void FRenderer::RenderOpaque(const FMatrix& ViewProjection)
 	DrawPackets(0, FirstTranslucentIndex, ViewProjection);
 }
 
-void FRenderer::RenderDecal(FDecalRenderer& DecalRenderer, const FDecalSceneProxy& Decal, const FMatrix& ViewProjection)
+void FRenderer::RenderDecal(FDecalRenderer& DecalRenderer, const FDecalSceneProxy& Decal, const FMatrix& ViewProjection, float ScreenFade)
 {
 	auto DrawReceiver = [&](const FRenderPacket& Receiver)
 	{
@@ -173,7 +173,7 @@ void FRenderer::RenderDecal(FDecalRenderer& DecalRenderer, const FDecalSceneProx
 			return;
 		}
 
-		DecalRenderer.OnRender(Receiver, Decal, ViewProjection);
+		DecalRenderer.OnRender(Receiver, Decal, ViewProjection, ScreenFade);
 	};
 
 	for (const FStaticDrawGroup* Group : StaticGroups)

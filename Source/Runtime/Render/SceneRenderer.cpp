@@ -356,8 +356,12 @@ void FSceneRenderer::RenderDecalPass(const FSceneView& SceneView, const FSceneRe
 
 	for (const FDecalSceneProxy* Decal : SortedDecals)
 	{
+		const float ScreenFade = FDecalRenderer::CalculateScreenFade(*Decal, SceneView.ViewProjection, SceneView.bOrthographic);
+		if (ScreenFade <= 0.f)
+			continue;
+
 		FStatOverlay::AddDecalSubmission();
-		Renderer->RenderDecal(*DecalRenderer, *Decal, SceneView.ViewProjection);
+		Renderer->RenderDecal(*DecalRenderer, *Decal, SceneView.ViewProjection, ScreenFade);
 	}
 
 	const uint64 ElapsedCycles = FPlatformTime::GetCycles64() - StartCycles;

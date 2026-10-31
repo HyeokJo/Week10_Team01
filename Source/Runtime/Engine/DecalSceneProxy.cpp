@@ -19,6 +19,7 @@ void FDecalSceneProxy::UpdateFromComponent()
 	Opacity = Component->GetRenderOpacity();
 	DecalColor = Component->GetDecalColor();
 	SortOrder = Component->GetSortOrder();
+	FadeScreenSize = Component->GetFadeScreenSize();
 	bHiddenInGame = Component->IsHiddenInGame();
 
 	const FBox LocalBounds{ -DecalSize, DecalSize };

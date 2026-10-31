@@ -26,7 +26,8 @@ class FDecalRenderer
 public:
 	bool Init();
 
-	void OnRender(const FRenderPacket& Receiver, const FDecalSceneProxy& Decal, const FMatrix& ViewProjection);
+	static float CalculateScreenFade(const FDecalSceneProxy& Decal, const FMatrix& ViewProjection, bool bOrthographic);
+	void OnRender(const FRenderPacket& Receiver, const FDecalSceneProxy& Decal, const FMatrix& ViewProjection, float ScreenFade);
 
 private:
 	FPipelineState PipelineState;

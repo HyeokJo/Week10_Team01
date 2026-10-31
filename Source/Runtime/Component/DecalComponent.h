@@ -15,6 +15,7 @@ class UDecalComponent : public USceneComponent
 		PROPERTY(Opacity)
 		PROPERTY(DecalColor)
 		PROPERTY(SortOrder)
+		PROPERTY(FadeScreenSize)
 		PROPERTY(FadeInStartDelay)
 		PROPERTY(FadeInDuration)
 		PROPERTY(FadeStartDelay)
@@ -47,6 +48,15 @@ public:
 	const FLinearColor& GetDecalColor() const { return DecalColor; }
 	float GetRenderOpacity() const { return Opacity * GetFadeAlpha(); }
 	int32 GetSortOrder() const { return SortOrder; }
+	float GetFadeScreenSize() const { return FadeScreenSize; }
+	void SetFadeScreenSize(float InFadeScreenSize)
+	{
+		InFadeScreenSize = FMath::Max(InFadeScreenSize, 0.f);
+		if (FadeScreenSize == InFadeScreenSize)
+			return;
+		FadeScreenSize = InFadeScreenSize;
+		MarkSceneProxyDirty();
+	}
 	void SetSortOrder(int32 InSortOrder)
 	{
 		if (SortOrder == InSortOrder)
@@ -70,6 +80,8 @@ private:
 	float Opacity = 1.f;
 	FLinearColor DecalColor = FLinearColor(1.f, 1.f, 1.f, 1.f);
 	int32 SortOrder = 0;
+	// Approximate projected diameter / view height. Zero disables screen-size fading.
+	float FadeScreenSize = 0.f;
 
 	// Both delays are measured from BeginPlay. Zero duration makes an instant transition.
 	float FadeInStartDelay = 0.f;

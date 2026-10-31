@@ -124,6 +124,7 @@ void UDecalComponent::ValidateParameters()
 	DecalSize.Y = FMath::Max(DecalSize.Y, 0.01f);
 	DecalSize.Z = FMath::Max(DecalSize.Z, 0.01f);
 	Opacity = FMath::Clamp(Opacity, 0.0f, 1.0f);
+	FadeScreenSize = FMath::Max(FadeScreenSize, 0.f);
 	DecalColor.R = FMath::Max(DecalColor.R, 0.f);
 	DecalColor.G = FMath::Max(DecalColor.G, 0.f);
 	DecalColor.B = FMath::Max(DecalColor.B, 0.f);
