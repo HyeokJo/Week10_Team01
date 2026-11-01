@@ -55,15 +55,31 @@
 //	FVector Ks = FVector(0.5f, 0.5f, 0.5f);
 //};
 //
-//struct FObjInfo
-//{
-//	FString Path; // 저장소 루트 기준
-//	TArray<FVector> Positions;
-//	TArray<FVector2> UVs;
-//	TArray<FVector> Normals;
-//	TArray<FObjFace> Faces;
-//	TArray<FObjSection> Sections;
-//	TArray<FString> Mtllibs; // .obj 폴더 기준
-//	TArray<FObjMaterialInfo> MaterialInfos;
-//};
-//
+
+struct FFbxImportOptions
+{
+	bool bImportStaticMesh = true;
+	bool bImportSkeletalMesh = false;
+	bool bImportMaterials = true;
+	bool bImportTextures = true;
+	bool bConvertScene = true;  // 축 변환
+	float ImportUniformScale = 1.0f;
+	bool bCombineMeshes = true;  // 노드 여러 개 → 1개
+	
+	//생각 나는 추가 옵션들
+	//중복 버텍스 제거(같은 위치)
+
+};
+
+struct FFbxInfo
+{
+	FString Path; // 저장소 루트 기준
+	TArray<FVector> Positions;
+	TArray<FVector2> UVs;
+	TArray<FVector> Normals;
+	//TArray<FObjFace> Faces;
+	//TArray<FObjSection> Sections;
+	//TArray<FString> Mtllibs; // .obj 폴더 기준
+	//TArray<FObjMaterialInfo> MaterialInfos;
+};
+

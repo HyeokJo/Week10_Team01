@@ -203,7 +203,12 @@ void UAssetManager::LoadAsset(const FString& Key, const FString& Path)
 	}
 	if (Extension == ".fbx")
 	{
-		FFbxImporter::DebugPrintScene(Path);
+		//테스트 로그
+		//FFbxImporter::DebugPrintScene(Path);
+		FFbxImportOptions FbxOption;
+		FbxOption.bImportStaticMesh = true;
+
+		LoadFbx(Path, FbxOption);
 	}
 }
 
@@ -479,6 +484,35 @@ ULevelSequence* UAssetManager::LoadLevelSequence(const FString& Path)
 	Get().RegisterAsset(Key, LevelSequence);
 
 	return LevelSequence;
+}
+
+UStaticMesh* UAssetManager::LoadFbx(const FString& Path, const FFbxImportOptions& Option)
+{
+	if (Option.bImportStaticMesh)
+	{
+		return LoadFbxStaticMesh(Path, Option);
+	}
+
+	return nullptr;
+}
+
+UStaticMesh* UAssetManager::LoadFbxStaticMesh(const FString& Path, const FFbxImportOptions& Option)
+{
+	const FString Key = MakeAssetKey(Path);
+	if (UStaticMesh* Cached = GetAssetByPath<UStaticMesh>(Key))
+	{
+		return Cached;
+	}
+
+	TUniquePtr<FStaticMeshData> Data = FFbxImporter::LoadStaticMeshData(Path, Option);
+	UStaticMesh* Mesh = CreateStaticMesh(Data.get());   // Data가 nullptr이면 nullptr 반환
+	if (!Mesh)
+	{
+		return nullptr;
+	}
+
+	Get().RegisterAsset(Key, Mesh);
+	return Mesh;
 }
 
 bool UAssetManager::ReorientStaticMesh(UStaticMesh& Mesh, const std::function<FVector(const FVector&)>& Rotate)

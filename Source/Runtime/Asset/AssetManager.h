@@ -17,6 +17,7 @@ enum class EAssetType
 class UStaticMesh;
 class ULevelSequence;
 class FShader;
+struct FFbxImportOptions;
 
 namespace fs = std::filesystem;
 
@@ -67,6 +68,8 @@ public:
 	UFont* LoadFontAtlas(const FString& JsonPath, const FString& AtlasTexturePath);
 	static UStaticMesh* LoadObjStaticMesh(const FString& Path);
 	static ULevelSequence* LoadLevelSequence(const FString& Path);
+	static UStaticMesh* LoadFbx(const FString& Path, const FFbxImportOptions& Option);
+	static UStaticMesh* LoadFbxStaticMesh(const FString& Path, const FFbxImportOptions& Option);
 
 	FLODGenerateResult GenerateStaticMeshLODs(UStaticMesh& Mesh,const FLODGenerateRequest& Request);
 

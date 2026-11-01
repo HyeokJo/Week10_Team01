@@ -1,12 +1,17 @@
 #include "EnginePCH.h"
 #include "FbxImporter.h"
+#include "FbxDebugScene.h"
+#include "Render/SkeletalMeshData.h"
+#include "Render/StaticMeshData.h"
+#include "Asset/ObjImporter/StaticMeshBake.h"
+
+#include "Core/EngineLog.h"
 
 //아래 define은 안 붙여줘도 되지만 fbxsdk 클래스를 들어갔다가 나오면 모호하다고 빨간 줄 뜬다.
 //아래 define을 0으로 바꿨다가 1로 다시 바꾸면 모호해지지 않는다.(1로 두도록 하자. 0이면 안된다)
 #define FBXSDK_NAMESPACE_USING 1
 #include <fbxsdk.h>
 
-#include "Render/SkeletalMeshData.h"
 
 //#include <fstream>
 //#include <sstream>
@@ -14,7 +19,6 @@
 //#include <filesystem>
 //#include <algorithm>
 
-#include "Core/EngineLog.h"
 //#include "Containers/Map.h"
 //#include "Containers/StringView.h"
 //#include "Render/Vertex.h"
@@ -44,35 +48,53 @@ bool FFbxImporter::DebugPrintScene(const FString& Path)
 	//Scene Create : fbx를 읽은 결과를 담는 그래프(노드 트리, 축, 단위, fps 등 전역 설정, 포즈, AnimStack이 모두 들어간다)
 	if (!CreateManager(Manager) || !CreateIOSetting(Manager, Ios) || !CreateImporter(Manager, Importer) || !CreateScene(Manager, Scene))
 	{
+		Destroy(Manager, Importer);
 		return false;
 	}
 
 	// Importer Initialize And Import
 	if (!InitializeImporter(Manager, Importer, Path) || !ImportFbx(Importer, Scene))
 	{
+		Destroy(Manager, Importer);
 		return false;
 	}
 		
-	//Display Scene
-	if (!DisplayScene(Scene))
-	{
-		return false;
-	}
+	//Display Scene : 로그 찍는 함수들은 FbxDebugScene에 모아 두었다
+	FFbxDebugScene::DisplayScene(Scene);
+
+	//Texture Path : 상대 경로를 fbx 파일 폴더 기준으로 풀어야 해서 Path가 필요하다
+	HTR_LOG(Info, "--------------------Texture Path--------------------");
+	FFbxDebugScene::DisplayTexturePaths(Scene, Path);
 
 	//Destroy
-	if (Importer)
-	{
-		Importer->Destroy();
-	}
-	if (Manager)
-	{
-		Manager->Destroy();
-	}
+	Destroy(Manager, Importer);	
 
 	return true;
 }
 
-TUniquePtr<FSkeletalMeshData> FFbxImporter::LoadStaticMeshData(const FString& Path)
+TUniquePtr<FStaticMeshData> FFbxImporter::LoadStaticMeshData(const FString& Path, const FFbxImportOptions& Option)
+{
+	const FString BinPath = Path + ".bin";
+
+	//// .bin 파일 읽기
+	//if (TUniquePtr<FStaticMeshData> Baked = FStaticMeshBake::ReadBaked(BinPath))
+	//{
+	//	return Baked;
+	//}
+
+	FFbxInfo Info;
+	TUniquePtr<FStaticMeshData> Data = MakeUnique<FStaticMeshData>();
+
+	if (!ParseFbx(Path, Info) || !CookStaticMesh(Info, *Data))
+	{
+		return nullptr;
+	}
+
+	FStaticMeshBake::WriteBaked(BinPath, *Data);
+	return Data;
+}
+
+TUniquePtr<FSkeletalMeshData> FFbxImporter::LoadSkeletalMeshData(const FString& Path)
 {
 	return TUniquePtr<FSkeletalMeshData>();
 }
@@ -245,153 +267,60 @@ bool FFbxImporter::ImportFbx(fbxsdk::FbxImporter* InImporter, fbxsdk::FbxScene* 
 	return bResult;
 }
 
-bool FFbxImporter::DisplayScene(fbxsdk::FbxScene* InScene)
+bool FFbxImporter::ParseFbx(const FString& Path, FFbxInfo& Out)
 {
-	//MetaData
-	DisplayMetaData(InScene);
-
-	FbxGlobalSettings& GSetting = InScene->GetGlobalSettings();
-
-	//Light Color
-	DisplayLightSettings(&GSetting);
-
-	//Camera
-	HTR_LOG(Info, "Default Camera : {}", GSetting.GetDefaultCamera().Buffer());
-
-	//Global Time Setting
-	DisplayTimeSettings(&GSetting);
-
-	//Hierarchy
-	DisplayHierarchy(InScene);
-
-	return true;
-}
-
-void FFbxImporter::DisplayMetaData(fbxsdk::FbxScene* InScene)
-{
-	FbxDocumentInfo* sceneInfo = InScene->GetSceneInfo();
-
-	if (sceneInfo)
+	if (Path.size() == 0)
 	{
-		HTR_LOG(Info, "--------------------Meta-Data--------------------");
-		HTR_LOG(Info, "    Title: {}", sceneInfo->mTitle.Buffer());
-		HTR_LOG(Info, "    Subject: {}", sceneInfo->mSubject.Buffer());
-		HTR_LOG(Info, "    Author: {}", sceneInfo->mAuthor.Buffer());
-		HTR_LOG(Info, "    Keywords: {}", sceneInfo->mKeywords.Buffer());
-		HTR_LOG(Info, "    Revision: {}", sceneInfo->mRevision.Buffer());
-		HTR_LOG(Info, "    Comment: {}", sceneInfo->mComment.Buffer());
-		HTR_LOG(Info, "--------------------Meta-Data--------------------");
-
-		FbxThumbnail* thumbnail = sceneInfo->GetSceneThumbnail();
-		if (thumbnail)
-		{
-			HTR_LOG(Info, "    Thumbnail:");
-
-			switch (thumbnail->GetDataFormat())
-			{
-				case FbxThumbnail::eRGB_24:
-					HTR_LOG(Info, "        Format: RGB");
-					break;
-				case FbxThumbnail::eRGBA_32:
-					HTR_LOG(Info, "        Format: RGBA");
-					break;
-			}
-
-			switch (thumbnail->GetSize())
-			{
-				default:
-					break;
-				case FbxThumbnail::eNotSet:
-					HTR_LOG(Info, "        Size: no dimensions specified ({} bytes)", thumbnail->GetSizeInBytes());
-					break;
-				case FbxThumbnail::e64x64:
-					HTR_LOG(Info, "        Size: 64 x 64 pixels ({} bytes)", thumbnail->GetSizeInBytes());
-					break;
-				case FbxThumbnail::e128x128:
-					HTR_LOG(Info, "        Size: 128 x 128 pixels ({} bytes)", thumbnail->GetSizeInBytes());
-			}
-		}
-	}
-}
-
-void FFbxImporter::DisplayLightSettings(fbxsdk::FbxGlobalSettings* InSettings)
-{
-	FbxColor pValue = InSettings->GetAmbientColor();
-
-	FbxString lString;
-
-	lString = "Ambient Color : ";
-	lString += (float)pValue.mRed;
-
-	lString += " (red), ";
-	lString += (float)pValue.mGreen;
-
-	lString += " (green), ";
-	lString += (float)pValue.mBlue;
-
-	lString += " (blue)";
-
-	HTR_LOG(Info, "{}", lString.Buffer());
-}
-
-void FFbxImporter::DisplayTimeSettings(fbxsdk::FbxGlobalSettings* InSettings)
-{
-	HTR_LOG(Info, "Time Node : {}", FbxGetTimeModeName(InSettings->GetTimeMode()));
-	FbxTimeSpan lTs;
-	FbxTime     lStart, lEnd;
-	char lTimeString[256];
-	InSettings->GetTimelineDefaultTimeSpan(lTs);
-	lStart = lTs.GetStart();
-	lEnd = lTs.GetStop();
-	HTR_LOG(Info, "Timeline default timespan: ");
-	HTR_LOG(Info, "     Start: {}", lStart.GetTimeString(lTimeString, FbxUShort(256)));
-	HTR_LOG(Info, "     Stop : {}", lEnd.GetTimeString(lTimeString, FbxUShort(256)));
-}
-
-void FFbxImporter::DisplayHierarchy(fbxsdk::FbxScene* InScene)
-{
-	int i;
-	FbxNode* lRootNode = InScene->GetRootNode();
-
-	for (i = 0; i < lRootNode->GetChildCount(); i++)
-	{
-		DisplayHierarchy(lRootNode->GetChild(i), 0);
-	}
-}
-
-void FFbxImporter::DisplayHierarchy(fbxsdk::FbxNode* pNode, int pDepth)
-{
-	FbxString lString;
-	int i;
-
-	for (i = 0; i < pDepth; i++)
-	{
-		lString += "  ";
+		HTR_LOG(Error, "FBX File Path is Empty!");
+		return false;
 	}
 
-	lString += pNode->GetName();
-	HTR_LOG(Info, "{}", lString.Buffer());
+	// Prepare the FBX SDK.
+	FbxManager* Manager = nullptr;
+	FbxImporter* Importer = nullptr;
+	FbxIOSettings* Ios = nullptr;
+	FbxScene* Scene = nullptr;
 
-	for (i = 0; i < pNode->GetChildCount(); i++)
+	HTR_LOG(Info, "FBX Import Test Start!");
+
+	//Manager Create
+	//FbxIOSettings Create : 무엇을 읽을지 고르는 옵션(머티리얼, 애니메이션 등)
+	//Importer Create : 파일을 열고(Initialize) Scene을 채운다. 작업을 마치고 Destroy해도 된다.
+	//Scene Create : fbx를 읽은 결과를 담는 그래프(노드 트리, 축, 단위, fps 등 전역 설정, 포즈, AnimStack이 모두 들어간다)
+	if (!CreateManager(Manager) || !CreateIOSetting(Manager, Ios) || !CreateImporter(Manager, Importer) || !CreateScene(Manager, Scene))
 	{
-		DisplayHierarchy(pNode->GetChild(i), pDepth + 1);
+		Destroy(Manager, Importer);
+		return false;
 	}
+
+	// Importer Initialize And Import
+	if (!InitializeImporter(Manager, Importer, Path) || !ImportFbx(Importer, Scene))
+	{
+		Destroy(Manager, Importer);
+		return false;
+	}
+
+
 }
 
-void FFbxImporter::DisplayContent(fbxsdk::FbxScene* pScene)
+bool FFbxImporter::CookSkeletalMesh(const FFbxInfo& Raw, FSkeletalMeshData& Out)
 {
-	int i;
-	FbxNode* lNode = pScene->GetRootNode();
-
-	if (lNode)
-	{
-		for (i = 0; i < lNode->GetChildCount(); i++)
-		{
-			DisplayContent(lNode->GetChild(i));
-		}
-	}
+	return false;
 }
 
-void FFbxImporter::DisplayContent(fbxsdk::FbxNode* pNode)
+bool FFbxImporter::CookStaticMesh(const FFbxInfo& Raw, FStaticMeshData& Out)
 {
+	return false;
+}
+
+void FFbxImporter::Destroy(FbxManager*& Manager, FbxImporter*& Importer)
+{
+	if (Importer)
+	{
+		Importer->Destroy();
+	}
+	if (Manager)
+	{
+		Manager->Destroy();
+	}
 }
