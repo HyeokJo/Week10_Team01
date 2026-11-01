@@ -33,6 +33,19 @@ namespace
         return PendingLogs;
     }
 
+    // 버퍼가 가득 차서 Sink에 넘기지 못하고 버린 로그 수. 첫 Sink가 붙을 때 경고로 알린다.
+    int32& GetDroppedPendingLogCount()
+    {
+        static int32 DroppedCount = 0;
+        return DroppedCount;
+    }
+
+    fs::path& GetLogFilePath()
+    {
+        static fs::path Path;
+        return Path;
+    }
+
     // TaskPool 작업에서도 로그를 찍으므로 파일과 버퍼 접근을 묶는다.
     // Sink가 OnLog 안에서 다시 로그를 찍을 수 있어 재진입이 되는 mutex를 쓴다.
     std::recursive_mutex& GetLogMutex()
@@ -157,7 +170,10 @@ void FLog::Init()
     // 공유 읽기를 허용해 실행 중에도 다른 프로그램으로 로그를 열어 볼 수 있게 한다
     GetLogFile() = _wfsopen(LogPath.c_str(), L"wb", _SH_DENYWR);
     if (GetLogFile())
-        WriteToFile(ELogVerbosity::Info, std::format("Log file: {}", fs::absolute(LogPath, Error).string()));
+    {
+        GetLogFilePath() = fs::absolute(LogPath, Error);
+        WriteToFile(ELogVerbosity::Info, std::format("Log file: {}", GetLogFilePath().string()));
+    }
 }
 
 void FLog::Shutdown()
@@ -184,6 +200,16 @@ void FLog::AddSink(ILogSink* Sink)
     GetPendingLogs().Empty();
     for (const FPendingLog& Pending : PendingLogs)
         Sink->OnLog(Pending.Verbosity, Pending.Message);
+
+    // 버린 로그가 있었다면 Sink 화면에서 끊긴 걸 알 수 있게 파일 위치와 함께 경고를 남긴다
+    if (int32& DroppedCount = GetDroppedPendingLogCount(); DroppedCount > 0)
+    {
+        const FString LogPath = GetLogFilePath().empty() ? FString("the log file") : GetLogFilePath().string();
+        const FString Warning = std::format("{} log lines were dropped before the log window was ready (buffer limit {}). See {}",
+            DroppedCount, MaxPendingLogs, LogPath);
+        DroppedCount = 0;
+        Emit(ELogVerbosity::Warning, Warning);
+    }
 }
 
 void FLog::RemoveSink(ILogSink* Sink)
@@ -207,6 +233,8 @@ void FLog::Emit(ELogVerbosity Verbosity, const FString& Message)
         TArray<FPendingLog>& PendingLogs = GetPendingLogs();
         if (PendingLogs.Num() < MaxPendingLogs)
             PendingLogs.Add({ Verbosity, Message });
+        else
+            ++GetDroppedPendingLogCount();
         return;
     }
 

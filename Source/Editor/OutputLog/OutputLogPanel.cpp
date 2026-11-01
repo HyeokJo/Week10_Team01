@@ -183,10 +183,12 @@ void FOutputLogPanel::RenderLogLines()
 
 			ImGui::PushID(ItemIndex);
 			ImGui::SetNextItemSelectionUserData(Row);
+			// Selectable은 판정 영역을 ItemSpacing 절반만큼 왼쪽으로 넓히므로 ItemRect가 아니라 호출 전 커서 위치에 글자를 그린다
+			const ImVec2 TextPos = ImGui::GetCursorScreenPos();
 			// 가로 스크롤이 생기도록 긴 줄은 글자 폭만큼 넓힌다
 			ImGui::Selectable("##LogLine", Selection.Contains(static_cast<ImGuiID>(ItemIndex)), ImGuiSelectableFlags_None,
 				ImVec2(std::max(AvailableWidth, TextSize.x), std::max(TextSize.y, ImGui::GetTextLineHeight())));
-			DrawList->AddText(ImGui::GetItemRectMin(), ImGui::ColorConvertFloat4ToU32(Item.Color), TextBegin, TextEnd);
+			DrawList->AddText(TextPos, ImGui::ColorConvertFloat4ToU32(Item.Color), TextBegin, TextEnd);
 			ImGui::PopID();
 		}
 	}
