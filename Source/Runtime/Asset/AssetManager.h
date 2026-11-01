@@ -68,7 +68,7 @@ public:
 	UFont* LoadFontAtlas(const FString& JsonPath, const FString& AtlasTexturePath);
 	static UStaticMesh* LoadObjStaticMesh(const FString& Path);
 	static ULevelSequence* LoadLevelSequence(const FString& Path);
-	static UStaticMesh* LoadFbx(const FString& Path, const FFbxImportOptions& Option);
+	static void LoadFbx(const FString& Path, const FFbxImportOptions& Option);
 	static UStaticMesh* LoadFbxStaticMesh(const FString& Path, const FFbxImportOptions& Option);
 
 	FLODGenerateResult GenerateStaticMeshLODs(UStaticMesh& Mesh,const FLODGenerateRequest& Request);

@@ -41,11 +41,11 @@ public:
 
 private:
 	// .fbx 파일 경로 -> FFbxInfo 변환
-	static bool ParseFbx(const FString& Path, FFbxInfo& Out);
+	static bool ParseFbx(const FString& Path, const FFbxImportOptions& Option, FFbxInfo& Out);
 
 	// FFbxInfo -> FSkeletalMeshData 변환
 	static bool CookSkeletalMesh(const FFbxInfo& Raw, FSkeletalMeshData& Out);
 	static bool CookStaticMesh(const FFbxInfo& Raw, FStaticMeshData& Out);
 
-	static void Destroy(fbxsdk::FbxManager*& Manager, fbxsdk::FbxImporter*& Importer);
+	static void Destroy(fbxsdk::FbxManager*& Manager);
 };

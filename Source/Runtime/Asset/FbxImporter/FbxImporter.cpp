@@ -48,14 +48,14 @@ bool FFbxImporter::DebugPrintScene(const FString& Path)
 	//Scene Create : fbx를 읽은 결과를 담는 그래프(노드 트리, 축, 단위, fps 등 전역 설정, 포즈, AnimStack이 모두 들어간다)
 	if (!CreateManager(Manager) || !CreateIOSetting(Manager, Ios) || !CreateImporter(Manager, Importer) || !CreateScene(Manager, Scene))
 	{
-		Destroy(Manager, Importer);
+		Destroy(Manager);
 		return false;
 	}
 
 	// Importer Initialize And Import
 	if (!InitializeImporter(Manager, Importer, Path) || !ImportFbx(Importer, Scene))
 	{
-		Destroy(Manager, Importer);
+		Destroy(Manager);
 		return false;
 	}
 		
@@ -67,7 +67,7 @@ bool FFbxImporter::DebugPrintScene(const FString& Path)
 	FFbxDebugScene::DisplayTexturePaths(Scene, Path);
 
 	//Destroy
-	Destroy(Manager, Importer);	
+	Destroy(Manager);	
 
 	return true;
 }
@@ -85,12 +85,12 @@ TUniquePtr<FStaticMeshData> FFbxImporter::LoadStaticMeshData(const FString& Path
 	FFbxInfo Info;
 	TUniquePtr<FStaticMeshData> Data = MakeUnique<FStaticMeshData>();
 
-	if (!ParseFbx(Path, Info) || !CookStaticMesh(Info, *Data))
+	if (!ParseFbx(Path, Option, Info) || !CookStaticMesh(Info, *Data))
 	{
 		return nullptr;
 	}
 
-	FStaticMeshBake::WriteBaked(BinPath, *Data);
+	//FStaticMeshBake::WriteBaked(BinPath, *Data);
 	return Data;
 }
 
@@ -139,6 +139,8 @@ bool FFbxImporter::CreateIOSetting(fbxsdk::FbxManager* InManager, fbxsdk::FbxIOS
 
 bool FFbxImporter::InitializeImporter(fbxsdk::FbxManager* InManager, fbxsdk::FbxImporter* InImporter, const FString& Path)
 {
+	if (Path.size() == 0) return false;
+
 	int lFileMajor, lFileMinor, lFileRevision;
 	int lSDKMajor, lSDKMinor, lSDKRevision;
 	int lAnimStackCount;
@@ -267,7 +269,7 @@ bool FFbxImporter::ImportFbx(fbxsdk::FbxImporter* InImporter, fbxsdk::FbxScene* 
 	return bResult;
 }
 
-bool FFbxImporter::ParseFbx(const FString& Path, FFbxInfo& Out)
+bool FFbxImporter::ParseFbx(const FString& Path, const FFbxImportOptions& Option, FFbxInfo& Out)
 {
 	if (Path.size() == 0)
 	{
@@ -289,18 +291,19 @@ bool FFbxImporter::ParseFbx(const FString& Path, FFbxInfo& Out)
 	//Scene Create : fbx를 읽은 결과를 담는 그래프(노드 트리, 축, 단위, fps 등 전역 설정, 포즈, AnimStack이 모두 들어간다)
 	if (!CreateManager(Manager) || !CreateIOSetting(Manager, Ios) || !CreateImporter(Manager, Importer) || !CreateScene(Manager, Scene))
 	{
-		Destroy(Manager, Importer);
+		Destroy(Manager);
 		return false;
 	}
 
 	// Importer Initialize And Import
 	if (!InitializeImporter(Manager, Importer, Path) || !ImportFbx(Importer, Scene))
 	{
-		Destroy(Manager, Importer);
+		Destroy(Manager);
 		return false;
 	}
 
-
+	Destroy(Manager);
+	return true;
 }
 
 bool FFbxImporter::CookSkeletalMesh(const FFbxInfo& Raw, FSkeletalMeshData& Out)
@@ -313,14 +316,11 @@ bool FFbxImporter::CookStaticMesh(const FFbxInfo& Raw, FStaticMeshData& Out)
 	return false;
 }
 
-void FFbxImporter::Destroy(FbxManager*& Manager, FbxImporter*& Importer)
+void FFbxImporter::Destroy(FbxManager*& Manager)
 {
-	if (Importer)
-	{
-		Importer->Destroy();
-	}
 	if (Manager)
 	{
 		Manager->Destroy();
+		Manager = nullptr;
 	}
 }

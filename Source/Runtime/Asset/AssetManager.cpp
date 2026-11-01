@@ -486,14 +486,12 @@ ULevelSequence* UAssetManager::LoadLevelSequence(const FString& Path)
 	return LevelSequence;
 }
 
-UStaticMesh* UAssetManager::LoadFbx(const FString& Path, const FFbxImportOptions& Option)
+void UAssetManager::LoadFbx(const FString& Path, const FFbxImportOptions& Option)
 {
 	if (Option.bImportStaticMesh)
 	{
-		return LoadFbxStaticMesh(Path, Option);
+		LoadFbxStaticMesh(Path, Option);
 	}
-
-	return nullptr;
 }
 
 UStaticMesh* UAssetManager::LoadFbxStaticMesh(const FString& Path, const FFbxImportOptions& Option)
