@@ -437,9 +437,6 @@ void FSceneRenderer::RenderDecalPass(const FSceneView& SceneView, const FSceneRe
 		return;
 	}
 
-	FFrustumCorners FrustumCorners{};
-	const bool bHasFrustumCorners = ExtractFrustumCorners(SceneView.ViewProjection, FrustumCorners);
-
 	FRenderingInfo PassInfo{};
 	PassInfo.ViewportSetting = SceneInfo.ViewportSetting;
 	FRenderingDesc DecalColorDesc{};
@@ -494,18 +491,6 @@ void FSceneRenderer::RenderDecalPass(const FSceneView& SceneView, const FSceneRe
 				return;
 			}
 
-			// BVH AABB 판정을 통과한 후보에 대해 정밀 OBB 판정을 수행한다.
-			if (bHasFrustumCorners)
-			{
-				FOrientedBox DecalOBB{};
-				const bool bValidOBB = TryMakeWorldOBB(Decal->CalcLocalBounds(), Decal->GetWorldMatrix(), DecalOBB);
-				if (bValidOBB && !IsOBBInFrustumSAT(DecalOBB, FrustumPlanes, FrustumCorners))
-				{
-					++DecalStats.NumOBBCulledDecals;
-					return;
-				}
-			}
-
 			++DecalStats.NumInFrustumDecals;
 			if (DecalRenderer->OnRender(SceneInfo.DepthStencil.Texture, SceneView.ViewProjection, *Decal, SceneInfo.ViewportSetting))
 			{
@@ -513,7 +498,7 @@ void FSceneRenderer::RenderDecalPass(const FSceneView& SceneView, const FSceneRe
 			}
 		});
 
-	DecalStats.NumFrustumCulledDecals = std::max(0, NumVisibleDecals - DecalStats.NumOBBCulledDecals - DecalStats.NumInFrustumDecals);
+	DecalStats.NumFrustumCulledDecals = std::max(0, NumVisibleDecals - DecalStats.NumInFrustumDecals);
 
 	RenderCommand::EndRenderPass();
 	RenderCommand::SetRasterizerState(ERasterizerState::SolidNone);
