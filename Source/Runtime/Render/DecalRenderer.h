@@ -25,10 +25,14 @@ struct FDecalConstants
 	uint32 bLit;
 	uint32 LightingModel;
 	uint32 bReceiveShadow;
-	FVector2 Padding;
+	uint32 bHasReceiverNormalMap;
+	uint32 bHasDecalNormalMap;
+	FVector2 ReceiverUVOffset;
+	uint32 bFlipReceiverNormalGreen;
+	uint32 bFlipDecalNormalGreen;
 };
 
-static_assert(sizeof(FDecalConstants) == 336);
+static_assert(sizeof(FDecalConstants) == 352);
 
 class FDecalRenderer
 {

@@ -220,9 +220,9 @@ float4 mainPS(FPSInput Input) : SV_TARGET
     float3 V = normalize(CameraPosition - Input.WorldPosition);
     
 #if USE_NORMAL_MAP
-    ComputeTiledLighting(N, Normal, Input.WorldPosition, V, Shininess, Input.Position.xy, DiffuseLight, SpecularLight, LIGHTING_MODEL, true);
+    ComputeTiledLighting(N, Normal, Input.WorldPosition, V, Shininess, Input.Position.xy, DiffuseLight, SpecularLight, LIGHTING_MODEL, true, true);
 #else
-    ComputeTiledLighting(N, Input.WorldPosition, V, Shininess, Input.Position.xy, DiffuseLight, SpecularLight, LIGHTING_MODEL, true);
+    ComputeTiledLighting(N, Input.WorldPosition, V, Shininess, Input.Position.xy, DiffuseLight, SpecularLight, LIGHTING_MODEL, true, false);
 #endif
     
 #endif

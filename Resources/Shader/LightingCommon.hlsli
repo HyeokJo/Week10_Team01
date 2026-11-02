@@ -699,7 +699,7 @@ void ComputeTiledLighting(float3 N,
 #if USE_NORMAL_MAP
     float3 GeoNormal,
 #endif
-float3 WorldPosition, float3 V, float n, float2 PixelPosition, out float3 DiffuseLight, out float3 SpecularLight, uint LightingModel, bool bReceiveShadow)
+float3 WorldPosition, float3 V, float n, float2 PixelPosition, out float3 DiffuseLight, out float3 SpecularLight, uint LightingModel, bool bReceiveShadow, bool bUseNormalMap)
 {
     DiffuseLight = 0.0f;
     SpecularLight = 0.0f;
@@ -709,7 +709,7 @@ float3 WorldPosition, float3 V, float n, float2 PixelPosition, out float3 Diffus
         float3 Il = DirectionalLight.Color;
         float3 L = -DirectionalLight.Direction;
 #if USE_NORMAL_MAP
-        float GeoFactor = saturate(dot(GeoNormal, L) * 4.0f);
+        float GeoFactor = bUseNormalMap ? saturate(dot(GeoNormal, L) * 4.0f) : 1.0f;
         float3 ShadowNormal = GeoNormal;
 #else
         float GeoFactor = 1.0f;
@@ -743,7 +743,7 @@ float3 WorldPosition, float3 V, float n, float2 PixelPosition, out float3 Diffus
 
         float3 L = ToLight / Distance;
 #if USE_NORMAL_MAP
-        float GeoFactor = saturate(dot(GeoNormal, L) * 4.0f);
+        float GeoFactor = bUseNormalMap ? saturate(dot(GeoNormal, L) * 4.0f) : 1.0f;
         if (GeoFactor <= 0.0f)
             continue;
 #else
@@ -781,7 +781,7 @@ float3 WorldPosition, float3 V, float n, float2 PixelPosition, out float3 Diffus
 
         float3 L = ToLight / Distance;
 #if USE_NORMAL_MAP
-        float GeoFactor = saturate(dot(GeoNormal, L) * 4.0f);
+        float GeoFactor = bUseNormalMap ? saturate(dot(GeoNormal, L) * 4.0f) : 1.0f;
         if (GeoFactor <= 0.0f)
             continue;
 #else

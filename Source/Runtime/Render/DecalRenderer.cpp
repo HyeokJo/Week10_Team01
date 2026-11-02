@@ -2,6 +2,7 @@
 #include "DecalRenderer.h"
 
 #include "Core/StatOverlay.h"
+#include "Core/EngineTimer.h"
 
 #include "Engine/DecalSceneProxy.h"
 #include "Engine/PrimitiveSceneProxy.h"
@@ -102,12 +103,22 @@ void FDecalRenderer::OnRender(const FRenderPacket& Receiver, const FDecalScenePr
 	Constants.bLit = SceneView.RenderMode.ViewMode == EViewMode::Lit ? 1u : 0u;
 	Constants.LightingModel = static_cast<uint32>(SceneView.RenderMode.LightingModel);
 	Constants.bReceiveShadow = !Receiver.Proxy || Receiver.Proxy->IsReceiveShadow() ? 1u : 0u;
+	UTexture2D* ReceiverNormal = Receiver.Material->Textures.Num() > 1 ? Receiver.Material->Textures[1] : nullptr;
+	Constants.bHasReceiverNormalMap = ReceiverNormal && SceneView.RenderMode.ShadingModel == EShadingModel::Phong ? 1u : 0u;
+	Constants.bHasDecalNormalMap = Decal.GetNormalTexture() ? 1u : 0u;
+	Constants.ReceiverUVOffset = Receiver.Material->UVScrollSpeed * EngineTimer::GetTotalTime();
+	Constants.bFlipReceiverNormalGreen = Receiver.Material->bFlipNormalGreen ? 1u : 0u;
+	Constants.bFlipDecalNormalGreen = Decal.IsNormalGreenFlipped() ? 1u : 0u;
 
 	RenderCommand::BindMesh(Receiver.Mesh, Receiver.LODIndex);
 	RenderCommand::BindPipelineState(PipelineState);
 
 	RenderCommand::BindShaderResource(0, DecalTexture, EShaderBindFlagBits::Pixel);
 	RenderCommand::BindSamplerState(0, ESamplerState::LinearClamp, EShaderBindFlagBits::Pixel);
+	RenderCommand::BindShaderResource(1, ReceiverNormal, EShaderBindFlagBits::Pixel, true);
+	RenderCommand::BindShaderResource(4, Decal.GetNormalTexture(), EShaderBindFlagBits::Pixel, true);
+	// s1/s2 belong to shadows; the receiver keeps its own UV addressing mode.
+	RenderCommand::BindSamplerState(3, Receiver.Material->SamplerState, EShaderBindFlagBits::Pixel);
 
 	RenderCommand::UpdateBufferData(ConstantBuffer.get(), &Constants, sizeof(Constants));
 
@@ -119,4 +130,6 @@ void FDecalRenderer::OnRender(const FRenderPacket& Receiver, const FDecalScenePr
 	FStatOverlay::AddDecalDrawCall();
 
 	RenderCommand::UnbindShaderResource(0, EShaderBindFlagBits::Pixel);
+	RenderCommand::UnbindShaderResource(1, EShaderBindFlagBits::Pixel);
+	RenderCommand::UnbindShaderResource(4, EShaderBindFlagBits::Pixel);
 }

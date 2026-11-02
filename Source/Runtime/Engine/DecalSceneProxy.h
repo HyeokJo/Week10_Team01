@@ -31,6 +31,8 @@ public:
 	bool IsHiddenInGame() const { return bHiddenInGame; }
 
 	UTexture2D* GetTexture() const { return Texture; }
+	UTexture2D* GetNormalTexture() const { return NormalTexture; }
+	bool IsNormalGreenFlipped() const { return bFlipNormalGreen; }
 
 private:
 	friend class FScene;
@@ -44,6 +46,8 @@ private:
 	FVector DecalSize = FVector(1.0f, 1.0f, 1.0f);
 	FBox Bounds{};
 	FString TexturePath;
+	FString NormalTexturePath;
+	bool bFlipNormalGreen = false;
 	float Opacity = 1.0f;
 	FLinearColor DecalColor = FLinearColor(1.f, 1.f, 1.f, 1.f);
 	int32 SortOrder = 0;
@@ -51,4 +55,5 @@ private:
 	bool bHiddenInGame = false;
 
 	UTexture2D* Texture = nullptr;
+	UTexture2D* NormalTexture = nullptr;
 };

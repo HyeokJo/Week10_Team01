@@ -12,6 +12,8 @@ class UDecalComponent : public USceneComponent
 	REFLECT_START(UDecalComponent)
 		PROPERTY(DecalSize)
 		PROPERTY(TexturePath)
+		PROPERTY(NormalTexturePath)
+		PROPERTY(bFlipNormalGreen)
 		PROPERTY(Opacity)
 		PROPERTY(DecalColor)
 		PROPERTY(SortOrder)
@@ -44,6 +46,8 @@ public:
 
 	const FVector& GetDecalSize() const { return DecalSize; }
 	const FString& GetTexturePath() const { return TexturePath; }
+	const FString& GetNormalTexturePath() const { return NormalTexturePath; }
+	bool IsNormalGreenFlipped() const { return bFlipNormalGreen; }
 	const float GetOpacity() const { return Opacity; }
 	const FLinearColor& GetDecalColor() const { return DecalColor; }
 	float GetRenderOpacity() const { return Opacity * GetFadeAlpha(); }
@@ -77,6 +81,8 @@ private:
 
 	FVector DecalSize = FVector(1.f, 1.f, 1.f);
 	FString TexturePath;
+	FString NormalTexturePath;
+	bool bFlipNormalGreen = false;
 	float Opacity = 1.f;
 	FLinearColor DecalColor = FLinearColor(1.f, 1.f, 1.f, 1.f);
 	int32 SortOrder = 0;
