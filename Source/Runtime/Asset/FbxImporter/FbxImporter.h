@@ -48,4 +48,12 @@ private:
 	static bool CookStaticMesh(const FFbxInfo& Raw, FStaticMeshData& Out);
 
 	static void Destroy(fbxsdk::FbxManager*& Manager);
+
+	static bool BeginFbxImport(const FString& Path, fbxsdk::FbxManager*& Manager, fbxsdk::FbxImporter*& Importer, 
+							   fbxsdk::FbxIOSettings*& Ios, fbxsdk::FbxScene*& Scene);
+	
+	static bool PrepareScene(fbxsdk::FbxManager* Manager, fbxsdk::FbxScene* Scene, const FFbxImportOptions& Option);
+
+	static bool ExtractScene(fbxsdk::FbxScene* Scene, const FString& Path, const FFbxImportOptions& Option, FFbxInfo& Out);
+
 };

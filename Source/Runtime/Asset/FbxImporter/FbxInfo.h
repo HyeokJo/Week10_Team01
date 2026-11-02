@@ -6,56 +6,6 @@
 #include "Math/Vector.h"
 #include "Math/Vector2.h"
 
-#include <functional>
-
-//struct FObjIndex
-//{
-//	int32 PositionIndex = -1;
-//	int32 UVIndex = -1;
-//	int32 NormalIndex = -1;
-//	int32 FaceIndex = -1;
-//
-//	bool operator==(const FObjIndex&) const = default;
-//};
-//
-//// Cook에서 (P, T, N) 조합으로 정점 중복을 제거할 때 쓰는 해시
-//struct FObjIndexHash
-//{
-//	size_t operator()(const FObjIndex& Index) const
-//	{
-//		size_t Hash = std::hash<int32>{}(Index.PositionIndex);
-//		Hash = Hash * 31 + std::hash<int32>{}(Index.UVIndex);
-//		Hash = Hash * 31 + std::hash<int32>{}(Index.NormalIndex);
-//		Hash = Hash * 31 + std::hash<int32>{}(Index.FaceIndex);
-//		return Hash;
-//	}
-//};
-//
-//struct FObjFace
-//{
-//	TArray<FObjIndex> Indexes;
-//};
-//
-//struct FObjSection
-//{
-//	FString Material;
-//	int32 MaterialIndex = 0;
-//	int32 Start = 0; // Faces Index
-//	int32 Count = 0;
-//};
-//
-//struct FObjMaterialInfo
-//{
-//	FString Name;
-//	FVector Kd = FVector(1.0f, 1.0f, 1.0f);
-//	FString MapKd; // 저장소 루트 기준
-//	FString MapKn;
-//	float D = 1.0f;
-//	float Ns = 32.0f;
-//	FVector Ks = FVector(0.5f, 0.5f, 0.5f);
-//};
-//
-
 struct FFbxImportOptions
 {
 	bool bImportStaticMesh = true;
@@ -71,15 +21,49 @@ struct FFbxImportOptions
 
 };
 
+// 삼각형 꼭짓점 하나
+struct FFbxPolygonVertex
+{
+	// 메시 안 Cp 번호 (나중에 스킨 가중치 찾기)
+	int32 ControlPointIndex = 0;
+
+	// 변환까지 끝난 값
+	FVector Normal = FVector(0.f, 0.f, 0.f);
+
+	// 아직 V를 뒤집기 전
+	FVector2 UV = FVector2(0.f, 0.f);
+
+	// 없으면 (1,1,1,1)
+	FVector4 Color = FVector4(1.f, 1.f, 1.f, 1.f);
+
+};
+
+struct FFbxMeshInfo
+{
+	FString Name;
+	TArray<FVector> ControlPoints;     // Global * Geometric 적용 후
+	TArray<FFbxPolygonVertex> PolygonVertices;   // 3개씩 = 삼각형
+	TArray<int32> TriangleMaterials; // 삼각형별 "전역" 슬롯 번호
+	bool bHasNormals = true;
+	bool bHasUVs = true;
+	bool bFlipWinding = false; // 행렬식 < 0
+
+};
+
+struct FFbxMaterialInfo
+{
+	FString Name; 
+	FVector Diffuse = FVector(0.f, 0.f, 0.f); 
+	float Opacity = 0.f; 
+	FVector Specular = FVector(0.f, 0.f, 0.f);
+	float Shininess = 0.f;
+	FString DiffuseTexture;
+	FString NormalTexture;        // 저장소 루트 기준
+};
+
 struct FFbxInfo
 {
 	FString Path; // 저장소 루트 기준
-	TArray<FVector> Positions;
-	TArray<FVector2> UVs;
-	TArray<FVector> Normals;
-	//TArray<FObjFace> Faces;
-	//TArray<FObjSection> Sections;
-	//TArray<FString> Mtllibs; // .obj 폴더 기준
-	//TArray<FObjMaterialInfo> MaterialInfos;
+	TArray<FFbxMeshInfo> Meshes;
+	TArray<FFbxMaterialInfo> Materials;
 };
-
