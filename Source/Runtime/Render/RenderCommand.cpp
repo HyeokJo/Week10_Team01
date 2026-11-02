@@ -304,6 +304,17 @@ void RenderCommand::SetViewport(uint32 InX, uint32 InY, uint32 InWidth, uint32 I
 	RenderDevice->GetContext()->RSSetViewports(1, &Viewport);
 }
 
+void RenderCommand::SetScissorRect(int32 Left, int32 Top, int32 Right, int32 Bottom)
+{
+	D3D11_RECT Rect{};
+	Rect.left = Left;
+	Rect.top = Top;
+	Rect.right = Right;
+	Rect.bottom = Bottom;
+
+	RenderDevice->GetContext()->RSSetScissorRects(1, &Rect);
+}
+
 void RenderCommand::SetRasterizerState(ERasterizerState State)
 {
 	RenderDevice->GetContext()->RSSetState(RenderDevice->GetRasterizerState(State));

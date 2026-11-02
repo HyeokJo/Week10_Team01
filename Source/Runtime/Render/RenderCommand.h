@@ -85,7 +85,7 @@ public:
 	static void ClearDepthStencil(FTexture2D* DepthStencilTexture, float Depth = 1.0f, uint8 Stencil = 0);
 
 	static void SetViewport(uint32 InX, uint32 InY, uint32 InWidth, uint32 InHeight);
-
+	static void SetScissorRect(int32 Left, int32 Top, int32 Right, int32 Bottom);
 	static void SetRasterizerState(ERasterizerState State);
 	static void SetBlendState(EBlendState State);
 	static void SetDepthStencilState(EDepthStencilState State, uint32 StencilRef = 0);

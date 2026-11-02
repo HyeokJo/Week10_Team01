@@ -507,7 +507,7 @@ void FSceneRenderer::RenderDecalPass(const FSceneView& SceneView, const FSceneRe
 			}
 
 			++DecalStats.NumInFrustumDecals;
-			if (DecalRenderer->OnRender(SceneInfo.DepthStencil.Texture, SceneView.ViewProjection, *Decal))
+			if (DecalRenderer->OnRender(SceneInfo.DepthStencil.Texture, SceneView.ViewProjection, *Decal, SceneInfo.ViewportSetting))
 			{
 				++DecalStats.NumDrawCalls;
 			}
@@ -516,7 +516,7 @@ void FSceneRenderer::RenderDecalPass(const FSceneView& SceneView, const FSceneRe
 	DecalStats.NumFrustumCulledDecals = std::max(0, NumVisibleDecals - DecalStats.NumOBBCulledDecals - DecalStats.NumInFrustumDecals);
 
 	RenderCommand::EndRenderPass();
-
+	RenderCommand::SetRasterizerState(ERasterizerState::SolidNone);
 	RenderCommand::UnbindShaderResource(0, EShaderBindFlagBits::Pixel);
 	RenderCommand::UnbindShaderResource(1, EShaderBindFlagBits::Pixel);
 	RenderCommand::UnbindShaderResource(2, EShaderBindFlagBits::Pixel);

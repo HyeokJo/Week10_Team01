@@ -210,6 +210,16 @@ void FRenderDevice::CreateStates()
 		ShadowDesc.SlopeScaledDepthBias = 2.0f;
 		ShadowDesc.DepthBiasClamp = 0.0f;
 		Device->CreateRasterizerState(&ShadowDesc, RasterizerStates[(uint8)ERasterizerState::ShadowDepth].GetAddressOf());
+
+		D3D11_RASTERIZER_DESC ScissorDesc = {};
+
+		ScissorDesc.FillMode = D3D11_FILL_SOLID;
+		ScissorDesc.CullMode = D3D11_CULL_NONE;
+		ScissorDesc.FrontCounterClockwise = FALSE;
+		ScissorDesc.DepthClipEnable = TRUE;
+		ScissorDesc.ScissorEnable = TRUE;
+
+		Device->CreateRasterizerState(&ScissorDesc, RasterizerStates[(uint8)ERasterizerState::SolidNoneScissor].GetAddressOf());
 	}
 
 	// ---------- DepthStencil ----------

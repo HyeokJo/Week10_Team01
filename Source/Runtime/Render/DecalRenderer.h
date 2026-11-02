@@ -6,6 +6,7 @@
 #include "Math/Color.h"
 class UDecalComponent;
 class FTexture2D;
+struct FViewportSettings;
 
 struct FDecalConstants
 {
@@ -26,7 +27,7 @@ class FDecalRenderer
 {
 public:
     bool Init();
-    bool OnRender(FTexture2D* DepthTexture, const FMatrix& ViewProjection, const UDecalComponent& Decal);
+    bool OnRender(FTexture2D* DepthTexture, const FMatrix& ViewProjection, const UDecalComponent& Decal, const FViewportSettings& Viewport);
 private:
     FPipelineState PipelineState;
     FShaderProgram* Shader = nullptr;
