@@ -25,7 +25,9 @@
 #ifndef HAS_NORMAL_MAP
 #define HAS_NORMAL_MAP 0
 #endif
-#define USE_NORMAL_MAP (SHADING_MODEL == SHADING_MODEL_PHONG && HAS_NORMAL_MAP)
+#define USE_RECEIVER_NORMAL_MAP (SHADING_MODEL == SHADING_MODEL_PHONG && HAS_NORMAL_MAP)
+// SSD normals also need geometric-normal shadow bias and horizon attenuation.
+#define USE_NORMAL_MAP 1
 
 #ifndef RECEIVE_SHADOW
 #define RECEIVE_SHADOW 1
@@ -48,7 +50,7 @@ struct FPSInput
     float3 Normal : NORMAL;
     float2 UV : TEXCOORD0;
     float3 WorldPosition : TEXCOORD1;
-#if USE_NORMAL_MAP
+#if USE_RECEIVER_NORMAL_MAP
     float3 Tangent : TANGENT;
     int BitangentSign : BITANGENT_SIGN;
 #endif
@@ -83,20 +85,23 @@ cbuffer PerObjectConstants : register(b2)
 
 Texture2D AlbedoTexture : register(t0);
 
-#if USE_NORMAL_MAP
+#if USE_RECEIVER_NORMAL_MAP
 Texture2D NormalTexture : register(t1);
 #endif
 
 SamplerState AlbedoSampler : register(s0);
 
 #include "LightingCommon.hlsli"
+#include "DecalCommon.hlsli"
 
 cbuffer DecalCompositeConstants : register(b7)
 {
     uint bEnableDecalBaseColor;
-    uint3 DecalCompositePadding;
+    uint bEnableDecalNormal;
+    uint2 DecalCompositePadding;
 };
 Texture2D<float4> DecalBaseColorTexture : register(t13);
+Texture2D<float4> DecalNormalTexture : register(t15);
 
 FPSInput mainVS(FVSInput Input)
 {
@@ -107,7 +112,7 @@ FPSInput mainVS(FVSInput Input)
     Output.Position = mul(WorldPosition, ViewProjection);
     Output.WorldPosition = WorldPosition.xyz;
     Output.Normal = mul(Input.Normal, (float3x3) NormalMatrix);
-#if USE_NORMAL_MAP
+#if USE_RECEIVER_NORMAL_MAP
     Output.Tangent = mul(Input.Tangent.xyz, (float3x3) World);
     Output.BitangentSign = Input.Tangent.w;
 #endif
@@ -144,7 +149,7 @@ float4 mainPS(FPSInput Input) : SV_TARGET
     
     float3 Normal = normalize(Input.Normal);
     
-#if USE_NORMAL_MAP
+#if USE_RECEIVER_NORMAL_MAP
     // 그람 슈미트 직교화
     float3 Tangent = normalize(Input.Tangent - dot(Input.Tangent, Normal) * Normal);
     float3 BiTangent = cross(Normal, Tangent) * Input.BitangentSign;
@@ -158,7 +163,18 @@ float4 mainPS(FPSInput Input) : SV_TARGET
 #else
     float3 WorldNormal = Normal;
 #endif
-   
+
+    bool bHasDecalNormal = false;
+#if VIEWMODE == VIEWMODE_LIT
+    if (bEnableDecalNormal != 0u)
+    {
+        float4 Slope = DecalNormalTexture.Load(int3(int2(Input.Position.xy), 0));
+        bHasDecalNormal = Slope.a > 1e-5f && dot(Slope.xyz, Slope.xyz) > 1e-12f;
+        if (bHasDecalNormal)
+            WorldNormal = ApplyDecalNormalSlope(normalize(WorldNormal), Normal, Slope);
+    }
+#endif
+
 #if VIEWMODE == VIEWMODE_UNLIT
     FinalColor = float4(Albedo, Alpha);
 #elif VIEWMODE == VIEWMODE_WORLDNORMAL
@@ -205,7 +221,7 @@ float4 mainPS(FPSInput Input) : SV_TARGET
         float BlendFactor;
         GetCascadeBlendInfo(Input.WorldPosition, CascadeIdx, NextCascadeIdx, BlendFactor);
 
-#if USE_NORMAL_MAP
+#if USE_RECEIVER_NORMAL_MAP
         float3 ShadowNormal = Normal;
 #else
         float3 ShadowNormal = WorldNormal;
@@ -226,19 +242,19 @@ float4 mainPS(FPSInput Input) : SV_TARGET
     float3 DiffuseLight;
     float3 SpecularLight;
 #if SHADING_MODEL == SHADING_MODEL_GOURAUD
-    DiffuseLight = Input.DiffuseLight;
-    SpecularLight = Input.SpecularLight;
-#else // Phong
-    float3 N = normalize(WorldNormal);
-    float3 V = normalize(CameraPosition - Input.WorldPosition);
-    
-#if USE_NORMAL_MAP
-    ComputeTiledLighting(N, Normal, Input.WorldPosition, V, Shininess, Input.Position.xy, DiffuseLight, SpecularLight, LIGHTING_MODEL, true, true);
-#else
-    ComputeTiledLighting(N, Input.WorldPosition, V, Shininess, Input.Position.xy, DiffuseLight, SpecularLight, LIGHTING_MODEL, true, false);
+    if (!bHasDecalNormal)
+    {
+        DiffuseLight = Input.DiffuseLight;
+        SpecularLight = Input.SpecularLight;
+    }
+    else
 #endif
-    
-#endif
+    {
+        float3 N = normalize(WorldNormal);
+        float3 V = normalize(CameraPosition - Input.WorldPosition);
+        ComputeTiledLighting(N, Normal, Input.WorldPosition, V, Shininess, Input.Position.xy,
+            DiffuseLight, SpecularLight, LIGHTING_MODEL, true, USE_RECEIVER_NORMAL_MAP || bHasDecalNormal);
+    }
     FinalColor = float4(Ka * AmbientLight.Color + Kd * DiffuseLight + Ks * SpecularLight, Alpha);
 #endif
     return FinalColor;

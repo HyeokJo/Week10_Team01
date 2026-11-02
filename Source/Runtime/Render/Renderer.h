@@ -73,7 +73,8 @@ struct FOcclusionMeasureResult
 struct FDecalCompositeConstants
 {
 	uint32 bEnableDecalBaseColor = 0;
-	uint32 Padding[3] = {};
+	uint32 bEnableDecalNormal = 0;
+	uint32 Padding[2] = {};
 };
 static_assert(sizeof(FDecalCompositeConstants) == 16);
 
@@ -152,7 +153,7 @@ public:
 
 	void SetOpaquePassMode(EOpaquePassMode Mode) { OpaquePassMode = Mode; }
 
-	void SetDecalBaseColorTexture(FTexture2D* Texture);
+	void SetDecalTextures(FTexture2D* BaseColor, FTexture2D* Normal);
 
 private:
 	// FIFO 소비용 배열의 용량만 재사용하며 매 View의 패킷 값은 새로 채운다.

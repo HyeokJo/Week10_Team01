@@ -103,7 +103,8 @@ namespace
 bool FScreenSpaceDecalRenderer::Init()
 {
     Shader = FRenderResourceManager::GetShaderProgram("Resources/Shader/DecalProjectionShader.hlsl");
-    if (!Shader)
+    ColorOnlyShader = FRenderResourceManager::GetShaderProgram("Resources/Shader/DecalProjectionShader.hlsl_COLORONLY");
+    if (!Shader || !ColorOnlyShader)
     {
         HTR_LOG(Error, "[Decal] Shader not found");
         return false;
@@ -159,7 +160,7 @@ bool FScreenSpaceDecalRenderer::EnsureInstanceCapacity(uint32 Count)
 }
 
 void FScreenSpaceDecalRenderer::OnRender(FTexture2D* DepthTexture, const FMatrix& ViewProjection,
-    const TArray<const FDecalSceneProxy*>& Decals, const FViewportSettings& Viewport, bool bOrthographic)
+    const TArray<const FDecalSceneProxy*>& Decals, const FViewportSettings& Viewport, bool bOrthographic, bool bWriteNormals)
 {
     if (!Shader || !ViewConstantBuffer || !ViewConstantBuffer->GetBuffer() || !BatchConstantBuffer || !BatchConstantBuffer->GetBuffer() ||
         !DepthTexture || !DepthTexture->GetStencilSRV() || Viewport.Width == 0 || Viewport.Height == 0)
@@ -176,6 +177,7 @@ void FScreenSpaceDecalRenderer::OnRender(FTexture2D* DepthTexture, const FMatrix
         FStatOverlay::AddDecalSubmission();
         UTexture2D* Texture = Decal->GetTexture();
         if (!Texture || !Texture->GetResource() || Decal->GetOpacity() <= 0.f) continue;
+        UTexture2D* NormalTexture = bWriteNormals ? Decal->GetNormalTexture() : nullptr;
         D3D11_RECT Rect{};
         if (!CalculateDecalScissorRect(*Decal, ViewProjection, Viewport, Rect)) continue;
 
@@ -189,10 +191,13 @@ void FScreenSpaceDecalRenderer::OnRender(FTexture2D* DepthTexture, const FMatrix
         Instance.ProjectionDirection = Decal->GetProjectionDirection();
         Instance.ProjectionEndFade = Decal->GetProjectionEndFade();
         Instance.AngleFadeCosines = Decal->GetAngleFadeCosines();
+        Instance.bHasNormalMap = NormalTexture && NormalTexture->GetResource() ? 1u : 0u;
+        Instance.bFlipNormalGreen = Decal->IsNormalGreenFlipped() ? 1u : 0u;
 
         // Only merge adjacent compatible draws: regrouping A/B/A by texture changes alpha compositing.
-        if (Batches.IsEmpty() || Batches.Last().Texture != Texture || Batches.Last().Sampler != Decal->GetSamplerState())
-            Batches.Add({Texture, Decal->GetSamplerState(), static_cast<uint32>(Instances.Num()), 0});
+        if (Batches.IsEmpty() || Batches.Last().Texture != Texture || Batches.Last().NormalTexture != NormalTexture ||
+            Batches.Last().Sampler != Decal->GetSamplerState())
+            Batches.Add({Texture, NormalTexture, Decal->GetSamplerState(), static_cast<uint32>(Instances.Num()), 0});
         ++Batches.Last().InstanceCount;
         Instances.Add(Instance);
     }
@@ -209,6 +214,7 @@ void FScreenSpaceDecalRenderer::OnRender(FTexture2D* DepthTexture, const FMatrix
     Constants.ViewportOrigin = FVector2(static_cast<float>(Viewport.StartX), static_cast<float>(Viewport.StartY));
     Constants.InverseViewportSize = FVector2(InvWidth, InvHeight);
 
+    PipelineState.Shader = bWriteNormals ? Shader : ColorOnlyShader;
     RenderCommand::BindPipelineState(PipelineState);
     RenderCommand::BindShaderResource(0, DepthTexture, EShaderBindFlagBits::Pixel);
     RenderCommand::BindStencilShaderResource(2, DepthTexture, EShaderBindFlagBits::Pixel);
@@ -224,9 +230,11 @@ void FScreenSpaceDecalRenderer::OnRender(FTexture2D* DepthTexture, const FMatrix
         FBatchConstants BatchConstants{Batch.FirstInstance};
         RenderCommand::UpdateBufferData(BatchConstantBuffer.get(), &BatchConstants);
         RenderCommand::BindShaderResource(1, Batch.Texture, EShaderBindFlagBits::Pixel);
+        RenderCommand::BindShaderResource(4, Batch.NormalTexture, EShaderBindFlagBits::Pixel, true);
         RenderCommand::BindSamplerState(0, Batch.Sampler, EShaderBindFlagBits::Pixel);
         RenderCommand::DrawInstanced(6, Batch.InstanceCount);
         FStatOverlay::AddDecalDrawCall();
     }
     RenderCommand::UnbindShaderResource(InstanceResourceSlot, EShaderBindFlagBits::Vertex | EShaderBindFlagBits::Pixel);
+    RenderCommand::UnbindShaderResource(4, EShaderBindFlagBits::Pixel);
 }

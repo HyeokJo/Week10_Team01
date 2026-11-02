@@ -31,6 +31,7 @@ void FSceneRenderTargets::Resize(uint32 InWidth, uint32 InHeight)
 	SceneColor = RenderCommand::CreateTexture2D(Desc);
 
 	DecalBaseColor = RenderCommand::CreateTexture2D(Desc);
+	DecalNormal = RenderCommand::CreateTexture2D(Desc);
 
 	Desc.Format = DXGI_FORMAT_R24G8_TYPELESS;
 	Desc.BindFlags = D3D11_BIND_DEPTH_STENCIL | D3D11_BIND_SHADER_RESOURCE;
@@ -63,6 +64,7 @@ void FSceneRenderTargets::Release()
 	ViewInfo = {};
 	SceneColor.reset();
 	DecalBaseColor.reset();
+	DecalNormal.reset();
 	ViewColor.reset();
 	Depth.reset();
 	FxaaTemp.reset();

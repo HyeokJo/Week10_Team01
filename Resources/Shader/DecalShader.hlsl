@@ -56,23 +56,6 @@ struct PSInput
     float2 ReceiverUV : TEXCOORD4;
 };
 
-float3 DecodeNormal(float3 Sample, bool bFlipGreen)
-{
-    float3 N = normalize(Sample * 2.0f - 1.0f);
-    N.y = bFlipGreen ? -N.y : N.y;
-    return N;
-}
-
-float3 BlendReorientedNormals(float3 Base, float3 Detail)
-{
-    // Both normals use the projected surface frame; a flat detail is identity.
-    float3 T = Base + float3(0.0f, 0.0f, 1.0f);
-    if (T.z < 1e-5f)
-        return float3(Detail.x, -Detail.y, -Detail.z);
-    float3 U = Detail * float3(-1.0f, -1.0f, 1.0f);
-    return normalize(T * (dot(T, U) / T.z) - U);
-}
-
 float3 ApplyProjectedNormal(float3 BaseNormal, float3 GeoNormal, float3 Detail,
     float3 PositionDX, float3 PositionDY, float2 UVDX, float2 UVDY)
 {

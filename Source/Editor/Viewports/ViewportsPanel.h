@@ -33,6 +33,7 @@ public:
 	// FXAA 결과를 임시로 받는 View별 텍스처. ColorTarget과 크기·포맷이 같다.
 	FTexture2D* GetFxaaTarget(int32 ViewIndex) const;
 	FTexture2D* GetDecalBaseColorTarget(int32 ViewIndex) const;
+	FTexture2D* GetDecalNormalTarget(int32 ViewIndex) const;
 
 	FVector2 GetContentSize() const { return {ContentSize.x, ContentSize.y}; }
 	FVector2 GetLocalMousePosition() const;
@@ -62,6 +63,7 @@ private:
 		// 씬은 Linear로 SceneColorTarget(float)에 그리고, 인코딩한 결과를 ColorTarget(sRGB 8비트)에 담아 화면에 표시한다
 		TUniquePtr<FTexture2D> SceneColorTarget;
 		TUniquePtr<FTexture2D> DecalBaseColorTarget;
+		TUniquePtr<FTexture2D> DecalNormalTarget;
 		TUniquePtr<FTexture2D> ColorTarget;
 		TUniquePtr<FTexture2D> DepthTarget;
 		TUniquePtr<FTexture2D> FxaaTarget;

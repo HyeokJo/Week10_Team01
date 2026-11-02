@@ -1,9 +1,14 @@
 #pragma pack_matrix(row_major)
 #include "DecalCommon.hlsli"
 
+#ifndef DECAL_WRITE_NORMAL
+#define DECAL_WRITE_NORMAL 1
+#endif
+
 Texture2D<float> SceneDepth : register(t0);
 Texture2D<float4> DecalTexture : register(t1);
 Texture2D<uint2> DecalReceiverMask : register(t2);
+Texture2D<float4> DecalNormalTexture : register(t4);
 SamplerState DecalSampler : register(s0);
 
 cbuffer DecalViewConstants : register(b0)
@@ -29,7 +34,8 @@ struct FDecalInstance
     float3 ProjectionDirection;
     float ProjectionEndFade;
     float2 AngleFadeCosines;
-    float2 Padding;
+    uint bHasNormalMap;
+    uint bFlipNormalGreen;
 };
 StructuredBuffer<FDecalInstance> DecalInstances : register(t14);
 
@@ -88,7 +94,32 @@ float3 ReconstructSurfaceNormal(int2 Pixel, float Depth, float3 PositionWS)
     return cross(NeighborX.xyz / NeighborX.w - PositionWS, NeighborY.xyz / NeighborY.w - PositionWS);
 }
 
-float4 mainPS(PSInput Input) : SV_TARGET
+float3 ComputeProjectedNormalSlope(float3 Detail, float3 SurfaceNormal, FDecalInstance Decal)
+{
+    float NormalLengthSq = dot(SurfaceNormal, SurfaceNormal);
+    if (NormalLengthSq <= 1e-30f)
+        return float3(0, 0, 0);
+    float3 N = SurfaceNormal * rsqrt(NormalLengthSq);
+    float3 GradientU = float3(Decal.WorldToDecal[0][1], Decal.WorldToDecal[1][1], Decal.WorldToDecal[2][1]);
+    float3 GradientV = -float3(Decal.WorldToDecal[0][2], Decal.WorldToDecal[1][2], Decal.WorldToDecal[2][2]);
+    float3 T = cross(GradientV, N);
+    float Det = dot(GradientU, T);
+    if (abs(Det) <= max(1e-20f, sqrt(dot(GradientU, GradientU) * dot(GradientV, GradientV)) * 1e-5f))
+        return float3(0, 0, 0);
+    T *= sign(Det) * rsqrt(dot(T, T));
+    float3 B = cross(N, T) * sign(Det);
+    return (T * Detail.x + B * Detail.y) / max(Detail.z, 1e-3f);
+}
+
+struct PSOutput
+{
+    float4 Color : SV_TARGET0;
+#if DECAL_WRITE_NORMAL
+    float4 NormalSlope : SV_TARGET1;
+#endif
+};
+
+PSOutput mainPS(PSInput Input)
 {
     int2 Pixel = int2(Input.Position.xy);
     float Depth = SceneDepth.Load(int3(Pixel, 0));
@@ -128,5 +159,18 @@ float4 mainPS(PSInput Input) : SV_TARGET
     Color.a *= saturate(Decal.Opacity) * saturate(Decal.BaseColor.a) * RangeFade * AngleFade;
     if (Color.a <= 0.001f)
         discard;
-    return Color;
+    PSOutput Output;
+    Output.Color = Color;
+#if DECAL_WRITE_NORMAL
+    float3 Slope = float3(0, 0, 0);
+    if (Decal.bHasNormalMap != 0u)
+    {
+        float3 Detail = DecodeNormal(DecalNormalTexture.SampleGrad(DecalSampler, DecalUV, DecalUVDX, DecalUVDY).xyz,
+            Decal.bFlipNormalGreen != 0u);
+        Slope = ComputeProjectedNormalSlope(Detail, NormalWS, Decal);
+    }
+    // A color-only layer also attenuates normal detail beneath it in the same sorted order.
+    Output.NormalSlope = float4(Slope, Color.a);
+#endif
+    return Output;
 }

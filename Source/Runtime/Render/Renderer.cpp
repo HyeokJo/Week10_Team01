@@ -884,19 +884,24 @@ void FRenderer::BindShadowForShading()
 	ShadowMapManager.BindForShading();
 }
 
-void FRenderer::SetDecalBaseColorTexture(FTexture2D* Texture)
+void FRenderer::SetDecalTextures(FTexture2D* BaseColor, FTexture2D* Normal)
 {
 	FDecalCompositeConstants Constants{};
-	Constants.bEnableDecalBaseColor = Texture ? 1u : 0u;
+	Constants.bEnableDecalBaseColor = BaseColor ? 1u : 0u;
+	Constants.bEnableDecalNormal = Normal ? 1u : 0u;
 	RenderCommand::UpdateBufferData(DecalCompositeCB.get(), &Constants);
 	RenderCommand::BindConstantBuffer(7, DecalCompositeCB.get(), EShaderBindFlagBits::Pixel);
 
-	if (Texture)
+	if (BaseColor)
 	{
-		RenderCommand::BindShaderResource(13, Texture, EShaderBindFlagBits::Pixel);
+		RenderCommand::BindShaderResource(13, BaseColor, EShaderBindFlagBits::Pixel);
 	}
 	else
 	{
 		RenderCommand::UnbindShaderResource(13, EShaderBindFlagBits::Pixel);
 	}
+	if (Normal)
+		RenderCommand::BindShaderResource(15, Normal, EShaderBindFlagBits::Pixel);
+	else
+		RenderCommand::UnbindShaderResource(15, EShaderBindFlagBits::Pixel);
 }

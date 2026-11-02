@@ -97,7 +97,7 @@ void FSceneRenderer::BeginFrame()
 }
 
 void FSceneRenderer::Render(UWorld& World, const FSceneView& SceneView, const FSceneRenderSettings& Settings,
-	const FRenderingInfo& SceneInfo, const FRenderingInfo& ViewInfo, FTexture2D* DecalBaseColorTarget, FTexture2D* FxaaTemp, FRenderQueue& RenderQueue)
+	const FRenderingInfo& SceneInfo, const FRenderingInfo& ViewInfo, FTexture2D* DecalBaseColorTarget, FTexture2D* DecalNormalTarget, FTexture2D* FxaaTemp, FRenderQueue& RenderQueue)
 {
 	FLightingConstants Lighting;
 	FShadowStats ShadowStats{};
@@ -161,7 +161,7 @@ void FSceneRenderer::Render(UWorld& World, const FSceneView& SceneView, const FS
 	FStatOverlay::SetShadowStats(ShadowStats);
 
 	// 1. 불투명·반투명 Pass (Linear 씬 컬러)
-	RenderOpaquePass(SceneView, Settings, World, SceneInfo, RenderQueue, Lighting.Directional, DecalBaseColorTarget, FrustumPlanes);
+	RenderOpaquePass(SceneView, Settings, World, SceneInfo, RenderQueue, Lighting.Directional, DecalBaseColorTarget, DecalNormalTarget, FrustumPlanes);
 
 	// 데이터 시각화 뷰는 씬 컬러 값 자체가 결과이므로 안개·인코딩·FXAA로 값을 바꾸지 않는다.
 	const EViewMode ViewMode = SceneView.RenderMode.ViewMode;
@@ -174,7 +174,7 @@ void FSceneRenderer::Render(UWorld& World, const FSceneView& SceneView, const FS
 	if (bCanRenderUnlitDecals)
 	{
 		FTexture2D* SceneColorTarget = SceneInfo.ColorRenderTargets[0].Texture;
-		RenderScreenSpaceDecalPass(SceneView, Settings, World, SceneInfo, SceneColorTarget, FrustumPlanes, true);
+		RenderScreenSpaceDecalPass(SceneView, Settings, World, SceneInfo, SceneColorTarget, nullptr, FrustumPlanes, true);
 	}
 
 	RenderTranslucentPass(SceneView, Settings, World, SceneInfo);
@@ -204,7 +204,7 @@ void FSceneRenderer::Render(UWorld& World, const FSceneView& SceneView, const FS
 
 void FSceneRenderer::RenderOpaquePass(const FSceneView& SceneView, const FSceneRenderSettings& Settings, const UWorld& ViewWorld,
 									const FRenderingInfo& SceneInfo, FRenderQueue& RenderQueue, const FDirectionalLightInfo& DirectionalLight,
-									FTexture2D* DecalBaseColorTarget, const FFrustumPlanes& FrustumPlanes)
+									FTexture2D* DecalBaseColorTarget, FTexture2D* DecalNormalTarget, const FFrustumPlanes& FrustumPlanes)
 {
 	const FViewRenderMode ViewRenderMode = SceneView.RenderMode;
 
@@ -219,7 +219,7 @@ void FSceneRenderer::RenderOpaquePass(const FSceneView& SceneView, const FSceneR
 
 	const ERasterizerState SceneRasterizerState = ViewRenderMode.ViewMode == EViewMode::Wireframe ? ERasterizerState::Wireframe : ERasterizerState::SolidBack;
 
-	Renderer->SetDecalBaseColorTexture(nullptr);
+	Renderer->SetDecalTextures(nullptr, nullptr);
 
 	if (ViewRenderMode.ViewMode == EViewMode::Lit)
 	{
@@ -270,11 +270,15 @@ void FSceneRenderer::RenderOpaquePass(const FSceneView& SceneView, const FSceneR
 
 		RenderCommand::EndRenderPass();
 
-		RenderScreenSpaceDecalPass(SceneView, Settings, ViewWorld, SceneInfo, DecalBaseColorTarget, FrustumPlanes, false);
+		const bool bHasNormalDecals = ViewRenderMode.ViewMode == EViewMode::Lit &&
+			std::any_of(Decals.begin(), Decals.end(), [](const FDecalSceneProxy* Decal)
+				{ return !Decal->IsRenderAsUnlit() && Decal->GetNormalTexture() && Decal->GetOpacity() > 0.f; });
+		FTexture2D* NormalTarget = bHasNormalDecals ? DecalNormalTarget : nullptr;
+		RenderScreenSpaceDecalPass(SceneView, Settings, ViewWorld, SceneInfo, DecalBaseColorTarget, NormalTarget, FrustumPlanes, false);
 
 		Renderer->BindShadowForShading();
 
-		Renderer->SetDecalBaseColorTexture(DecalBaseColorTarget);
+		Renderer->SetDecalTextures(DecalBaseColorTarget, NormalTarget);
 	}
 
 	FRenderingInfo PassInfo = SceneInfo;
@@ -310,7 +314,7 @@ void FSceneRenderer::RenderOpaquePass(const FSceneView& SceneView, const FSceneR
 	}
 
 	RenderCommand::EndRenderPass();
-	Renderer->SetDecalBaseColorTexture(nullptr);
+	Renderer->SetDecalTextures(nullptr, nullptr);
 }
 
 void FSceneRenderer::DrawWorldText(const FSceneView& SceneView, const UWorld& ViewWorld)
@@ -452,7 +456,7 @@ void FSceneRenderer::RenderReceiverDecalPass(const FSceneView& SceneView, const 
 }
 
 void FSceneRenderer::RenderScreenSpaceDecalPass(const FSceneView& SceneView, const FSceneRenderSettings& Settings, const UWorld& ViewWorld,
-    const FRenderingInfo& SceneInfo, FTexture2D* OutputTarget, const FFrustumPlanes& FrustumPlanes, bool bRenderAsUnlit)
+    const FRenderingInfo& SceneInfo, FTexture2D* OutputTarget, FTexture2D* NormalTarget, const FFrustumPlanes& FrustumPlanes, bool bRenderAsUnlit)
 {
     if (!Settings.bDrawDecals || !Settings.bDrawPrimitives || !OutputTarget || !ScreenSpaceDecalRenderer)
         return;
@@ -467,10 +471,17 @@ void FSceneRenderer::RenderScreenSpaceDecalPass(const FSceneView& SceneView, con
     Color.LoadOp = bRenderAsUnlit ? ERenderTargetLoadOp::Load : ERenderTargetLoadOp::Clear;
     Color.ClearValue.ColorClearValue = FVector4(0.f, 0.f, 0.f, 0.f);
     PassInfo.ColorRenderTargets.Add(Color);
+    if (NormalTarget)
+    {
+        FRenderingDesc Normal = Color;
+        Normal.Texture = NormalTarget;
+        Normal.LoadOp = ERenderTargetLoadOp::Clear;
+        PassInfo.ColorRenderTargets.Add(Normal);
+    }
     PassInfo.DepthStencil.Texture = nullptr;
     RenderCommand::BeginRenderPass(PassInfo);
     ScreenSpaceDecalRenderer->OnRender(SceneInfo.DepthStencil.Texture, SceneView.ViewProjection, Decals,
-        SceneInfo.ViewportSetting, SceneView.bOrthographic);
+        SceneInfo.ViewportSetting, SceneView.bOrthographic, NormalTarget != nullptr);
     RenderCommand::EndRenderPass();
     RenderCommand::SetRasterizerState(ERasterizerState::SolidBack);
     RenderCommand::UnbindShaderResource(0, EShaderBindFlagBits::Pixel);

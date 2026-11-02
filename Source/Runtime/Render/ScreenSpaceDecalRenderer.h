@@ -28,7 +28,8 @@ struct FScreenSpaceDecalInstance
     FVector ProjectionDirection;
     float ProjectionEndFade;
     FVector2 AngleFadeCosines;
-    FVector2 Padding;
+    uint32 bHasNormalMap;
+    uint32 bFlipNormalGreen;
 };
 static_assert(sizeof(FScreenSpaceDecalInstance) == 144);
 
@@ -37,11 +38,12 @@ class FScreenSpaceDecalRenderer
 public:
     bool Init();
     void OnRender(FTexture2D* DepthTexture, const FMatrix& ViewProjection, const TArray<const FDecalSceneProxy*>& Decals,
-        const FViewportSettings& Viewport, bool bOrthographic);
+        const FViewportSettings& Viewport, bool bOrthographic, bool bWriteNormals = false);
 private:
     struct FBatch
     {
         UTexture2D* Texture;
+        UTexture2D* NormalTexture;
         ESamplerState Sampler;
         uint32 FirstInstance;
         uint32 InstanceCount;
@@ -50,6 +52,7 @@ private:
     bool EnsureInstanceCapacity(uint32 Count);
     FPipelineState PipelineState;
     FShaderProgram* Shader = nullptr;
+    FShaderProgram* ColorOnlyShader = nullptr;
     TUniquePtr<FConstantBuffer> ViewConstantBuffer;
     TUniquePtr<FConstantBuffer> BatchConstantBuffer;
     ComPtr<ID3D11Buffer> InstanceBuffer;
