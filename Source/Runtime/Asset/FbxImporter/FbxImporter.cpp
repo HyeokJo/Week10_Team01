@@ -372,11 +372,14 @@ namespace
 			if (MaterialElement)
 			{
 				const int IndexInArray = MaterialElement->GetMappingMode() == FbxLayerElement::eAllSame ? 0 : p;
-				const int LocalSlot = MaterialElement->GetIndexArray().GetAt(IndexInArray);
-				if (LocalSlot >= 0 && LocalSlot < LocalToGlobal.Num())
+				if (IndexInArray < MaterialElement->GetIndexArray().GetCount())
 				{
-					GlobalSlot = LocalToGlobal[LocalSlot];
-				}
+					const int LocalSlot = MaterialElement->GetIndexArray().GetAt(IndexInArray);
+					if (LocalSlot >= 0 && LocalSlot < LocalToGlobal.Num())
+					{
+						GlobalSlot = LocalToGlobal[LocalSlot];
+					}
+				}				
 			}
 			Out.TriangleMaterials.Add(GlobalSlot);
 		}
@@ -800,8 +803,26 @@ bool FFbxImporter::CookStaticMesh(const FFbxInfo& Raw, FStaticMeshData& Out)
 				Indices[c] = NewIndex;
 			}
 
+			// 슬롯을 만든 뒤: -1(머티리얼 없음)을 쓰는 삼각형이 있으면 Default 슬롯을 하나 추가
+			int32 DefaultSlot = -1;
+			auto GetDefaultSlot = [&]()
+				{
+					if (DefaultSlot < 0)
+					{
+						FStaticMaterialSlot Slot;
+						Slot.Name = "Default";
+						DefaultSlot = Cooked.MaterialSlots.Add(Slot);   // TArray::Add가 인덱스를 돌려주는지 확인. 아니면 Num() - 1
+						SlotIndices.AddDefaulted_GetRef();                     // 버킷도 같이 늘림
+					}
+					return DefaultSlot;
+				};
+
+			// 삼각형 루프 안
 			int32 Slot = Mesh.TriangleMaterials[Tri];
-			if (Slot < 0 || Slot >= SlotCount) Slot = 0;
+			if (Slot < 0 || Slot >= Raw.Materials.Num())
+			{
+				Slot = GetDefaultSlot();
+			}
 			TArray<uint32>& Bucket = SlotIndices[Slot];
 
 			// OBJ와 같이 (0, 2, 1)로 뒤집는다. 거울 스케일이면 이미 한 번 뒤집혀 있으니 원래 순서로.
