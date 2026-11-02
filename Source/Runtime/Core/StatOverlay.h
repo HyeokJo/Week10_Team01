@@ -29,6 +29,10 @@ struct FShadowStats {
 // 프레임 내 모든 View의 처리 요청과 실제 드로우 호출을 합산한다.
 struct FDecalStats
 {
+	int32 NumTotalDecals = 0;
+	int32 NumHiddenDecals = 0;
+	int32 NumFrustumCulledDecals = 0;
+	int32 NumInFrustumDecals = 0;
 	int32 SubmittedDecals = 0;
 	int32 DrawCalls = 0;
 	double CPUTimeMs = 0.0;
@@ -70,6 +74,13 @@ public:
 	static void AddDecalSubmission() { ++DecalStats.SubmittedDecals; }
 	static void AddDecalDrawCall() { ++DecalStats.DrawCalls; }
 	static void AddDecalCPUTime(double TimeMs) { DecalStats.CPUTimeMs += TimeMs; }
+	static void AddDecalVisibility(int32 Total, int32 Hidden, int32 Culled, int32 InFrustum)
+	{
+		DecalStats.NumTotalDecals += Total;
+		DecalStats.NumHiddenDecals += Hidden;
+		DecalStats.NumFrustumCulledDecals += Culled;
+		DecalStats.NumInFrustumDecals += InFrustum;
+	}
 
 private:
 	// 표시 수치 갱신 주기(초). 너무 짧으면 숫자가 읽히지 않는다.

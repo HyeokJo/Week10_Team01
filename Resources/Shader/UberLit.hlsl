@@ -91,6 +91,13 @@ SamplerState AlbedoSampler : register(s0);
 
 #include "LightingCommon.hlsli"
 
+cbuffer DecalCompositeConstants : register(b7)
+{
+    uint bEnableDecalBaseColor;
+    uint3 DecalCompositePadding;
+};
+Texture2D<float4> DecalBaseColorTexture : register(t13);
+
 FPSInput mainVS(FVSInput Input)
 {
     FPSInput Output;
@@ -124,6 +131,12 @@ float4 mainPS(FPSInput Input) : SV_TARGET
 
     float3 Albedo = SurfaceColor.rgb;
     float Alpha = bOpaque ? 1.0f : SurfaceColor.a;
+
+    if (bEnableDecalBaseColor != 0u)
+    {
+        float4 DecalColor = DecalBaseColorTexture.Load(int3(int2(Input.Position.xy), 0));
+        Albedo = DecalColor.rgb + Albedo * (1.0f - DecalColor.a);
+    }
 
     float3 Kd = Albedo;
     float3 Ka = Kd; // 나중에 Ka 를 개별로 설정할 수 있음

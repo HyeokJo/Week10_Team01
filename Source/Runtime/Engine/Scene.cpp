@@ -6,6 +6,8 @@
 #include "Component/DecalComponent.h"
 #include "DecalSceneProxy.h"
 
+FScene::FScene() : DecalBVH([](const FDecalSceneProxy* Proxy) { return Proxy->GetBounds(); }) {}
+
 void FScene::AddPrimitive(UPrimitiveComponent* Component)
 {
 	if (!Component || Component->SceneProxy) return;
@@ -241,12 +243,22 @@ void FScene::UpdateAllTransforms()
 	}
 	DirtyLights.Reset();
 
+	const bool bDecalBoundsChanged = !DirtyDecals.IsEmpty();
 	for (FDecalSceneProxy* Proxy : DirtyDecals)
 	{
 		Proxy->UpdateFromComponent();
 		Proxy->bQueuedForUpdate = false;
 	}
 	DirtyDecals.Reset();
+	if (bDecalElementListChanged)
+	{
+		DecalBVH.Build(std::span(DecalProxies.GetData(), DecalProxies.Num()));
+		bDecalElementListChanged = false;
+	}
+	else if (bDecalBoundsChanged)
+	{
+		DecalBVH.Refit();
+	}
 
 	//const int32 Count = Proxies.Num();
 	//for (int32 i = 0; i < Count; ++i)
@@ -532,6 +544,7 @@ void FScene::AddDecal(UDecalComponent* Component)
 
 	Proxy->UpdateFromComponent();
 	DecalProxies.Add(Proxy);
+	bDecalElementListChanged = true;
 }
 
 void FScene::RemoveDecal(UDecalComponent* Component)
@@ -548,6 +561,7 @@ void FScene::RemoveDecal(UDecalComponent* Component)
 
 	Component->SceneProxy = nullptr;
 	delete Proxy;
+	bDecalElementListChanged = true;
 }
 
 void FScene::RemoveAllDecals()
@@ -560,6 +574,8 @@ void FScene::RemoveAllDecals()
 
 	DecalProxies.Reset();
 	DirtyDecals.Reset();
+	DecalBVH.Clear();
+	bDecalElementListChanged = false;
 }
 
 void FScene::MarkDecalDirty(FDecalSceneProxy* Proxy)

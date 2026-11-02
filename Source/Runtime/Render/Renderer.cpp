@@ -78,6 +78,7 @@ bool FRenderer::Init()
 	ViewCB = RenderCommand::CreateConstantBuffer(sizeof(FViewConstants));
 	ShadowViewCB = RenderCommand::CreateConstantBuffer(sizeof(FMatrix));
 	LightingCB = RenderCommand::CreateConstantBuffer(sizeof(FLightingConstants));
+	DecalCompositeCB = RenderCommand::CreateConstantBuffer(sizeof(FDecalCompositeConstants));
 	FLightingConstants LightingConstant{};
 	RenderCommand::UpdateBufferData(LightingCB.get(), &LightingConstant);
 
@@ -142,6 +143,38 @@ void FRenderer::UploadPerObjectConstants()
 	RenderCommand::Unmap(PerObjectSlotCB.get());
 }
 
+void FRenderer::ApplyOpaquePassState(const UMaterial* Material, const FPrimitiveSceneProxy* Proxy)
+{
+	if (OpaquePassMode == EOpaquePassMode::DepthPrepass)
+	{
+		if (Material->BlendState != EBlendState::Opaque)
+		{
+			return;
+		}
+
+		RenderCommand::SetBlendState(EBlendState::NoColorWrite);
+		if (Material->DepthStencilState == EDepthStencilState::Default)
+		{
+			const bool bReceiveDecal = Proxy ? Proxy->IsReceiveDecal() : true;
+			RenderCommand::SetDepthStencilState(EDepthStencilState::DecalReceiverMask, bReceiveDecal ? 0x80 : 0x00);
+		}
+		return;
+	}
+	if (Material->BlendState != EBlendState::Opaque || Material->DepthStencilState != EDepthStencilState::Default)
+	{
+		return;
+	}
+	if (OpaquePassMode == EOpaquePassMode::DepthReadOnly)
+	{
+		RenderCommand::SetDepthStencilState(EDepthStencilState::ReadOnlyLessEqual);
+	}
+	else
+	{
+		const bool bReceiveDecal = Proxy ? Proxy->IsReceiveDecal() : true;
+		RenderCommand::SetDepthStencilState(EDepthStencilState::DecalReceiverMask, bReceiveDecal ? 0x80 : 0x00);
+	}
+}
+
 // 불투명 우선·반투명 거리순으로 정렬해 View 행렬과 Section 범위로 그린다.
 void FRenderer::RenderAll(FRenderQueue& InQueue, const FMatrix& ViewProjection, const FVector& CameraPosition)
 {
@@ -154,6 +187,8 @@ void FRenderer::RenderOpaque(const FMatrix& ViewProjection)
 {
 	DrawStaticGroups();
 	DrawPackets(0, FirstTranslucentIndex, ViewProjection);
+	RenderCommand::SetDepthStencilState(EDepthStencilState::Default);
+	OpaquePassMode = EOpaquePassMode::Normal;
 }
 
 void FRenderer::PrepareDecalReceivers()
@@ -280,6 +315,9 @@ void FRenderer::DrawStaticGroups()
 				RenderCommand::BindConstantBuffer(2, PerObjectCB.get(), EShaderBindFlagBits::Vertex);
 				UpdatePerObjectConstants(Item.Proxy->GetLocalToWorld(), Item.Proxy->GetNormalMatrix());
 			}
+
+			ApplyOpaquePassState(Group->Material, Item.Proxy);
+
 			RenderCommand::DrawIndexed(Item.IndexCount, Item.StartIndex);
 		}
 	}
@@ -370,6 +408,8 @@ void FRenderer::DrawPackets(uint32 Begin, uint32 End, const FMatrix& ViewProject
 			RenderCommand::BindConstantBuffer(2, PerObjectCB.get(), EShaderBindFlagBits::Vertex);
 			UpdatePerObjectConstants(RenderPacket, ViewProjection);
 		}
+
+		ApplyOpaquePassState(RenderPacket.Material, RenderPacket.Proxy);
 
 		RenderCommand::DrawIndexed(
 			RenderPacket.IndexCount ? RenderPacket.IndexCount : RenderPacket.Mesh->GetIndexBuffer(RenderPacket.LODIndex)->GetIndexCount(),
@@ -842,4 +882,21 @@ void FRenderer::RenderShadowPass(
 void FRenderer::BindShadowForShading()
 {
 	ShadowMapManager.BindForShading();
+}
+
+void FRenderer::SetDecalBaseColorTexture(FTexture2D* Texture)
+{
+	FDecalCompositeConstants Constants{};
+	Constants.bEnableDecalBaseColor = Texture ? 1u : 0u;
+	RenderCommand::UpdateBufferData(DecalCompositeCB.get(), &Constants);
+	RenderCommand::BindConstantBuffer(7, DecalCompositeCB.get(), EShaderBindFlagBits::Pixel);
+
+	if (Texture)
+	{
+		RenderCommand::BindShaderResource(13, Texture, EShaderBindFlagBits::Pixel);
+	}
+	else
+	{
+		RenderCommand::UnbindShaderResource(13, EShaderBindFlagBits::Pixel);
+	}
 }

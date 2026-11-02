@@ -136,7 +136,7 @@ void UGameEngine::Tick(float DeltaTime)
 		//RenderSettings.DamageEffectIntensity = 1.0f;
 		RenderSettings.DamageEffectIntensity = Player->GetDamageEffectIntensity();
 	}
-	SceneRenderer.Render(*World, SceneView, RenderSettings, SceneRenderTargets.SceneInfo, SceneRenderTargets.ViewInfo, SceneRenderTargets.FxaaTemp.get(), RenderQueue);
+	SceneRenderer.Render(*World, SceneView, RenderSettings, SceneRenderTargets.SceneInfo, SceneRenderTargets.ViewInfo, SceneRenderTargets.DecalBaseColor.get(), SceneRenderTargets.FxaaTemp.get(), RenderQueue);
 
 	// ========== UI 렌더링 ===========
 	FRenderingInfo UIInfo = SceneRenderTargets.ViewInfo;

@@ -114,7 +114,7 @@ void FDecalRenderer::OnRender(const FRenderPacket& Receiver, const FDecalScenePr
 	RenderCommand::BindPipelineState(PipelineState);
 
 	RenderCommand::BindShaderResource(0, DecalTexture, EShaderBindFlagBits::Pixel);
-	RenderCommand::BindSamplerState(0, ESamplerState::LinearClamp, EShaderBindFlagBits::Pixel);
+	RenderCommand::BindSamplerState(0, Decal.GetSamplerState(), EShaderBindFlagBits::Pixel);
 	RenderCommand::BindShaderResource(1, ReceiverNormal, EShaderBindFlagBits::Pixel, true);
 	RenderCommand::BindShaderResource(4, Decal.GetNormalTexture(), EShaderBindFlagBits::Pixel, true);
 	// s1/s2 belong to shadows; the receiver keeps its own UV addressing mode.

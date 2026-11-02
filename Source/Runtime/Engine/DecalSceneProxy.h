@@ -4,6 +4,7 @@
 #include "Math/EngineMath.h"
 #include "Math/Frustum.h"
 #include "Math/Color.h"
+#include "Render/RenderStates.h"
 
 class FScene;
 class UDecalComponent;
@@ -33,6 +34,9 @@ public:
 	UTexture2D* GetTexture() const { return Texture; }
 	UTexture2D* GetNormalTexture() const { return NormalTexture; }
 	bool IsNormalGreenFlipped() const { return bFlipNormalGreen; }
+	bool IsRenderAsUnlit() const { return bRenderAsUnlit; }
+	float GetProjectionEndFade() const { return ProjectionEndFade; }
+	ESamplerState GetSamplerState() const { return SamplerState; }
 
 private:
 	friend class FScene;
@@ -56,4 +60,7 @@ private:
 
 	UTexture2D* Texture = nullptr;
 	UTexture2D* NormalTexture = nullptr;
+	bool bRenderAsUnlit = false;
+	float ProjectionEndFade = 0.f;
+	ESamplerState SamplerState = ESamplerState::LinearClamp;
 };

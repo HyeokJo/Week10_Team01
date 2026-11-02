@@ -3,7 +3,7 @@
 #include "ShadowFilterSettings.h"
 #include "ViewMode.h"
 #include "Camera/CameraTypes.h"
-
+#include "Math/Frustum.h"
 class FDepthViewRenderer;
 struct FShadowInfo;
 class FTextRenderer;
@@ -18,7 +18,7 @@ struct FRenderingInfo;
 class UWorld;
 class FRenderer;
 class FDecalRenderer;
-
+class FScreenSpaceDecalRenderer;
 struct FSceneView
 {
 	FMatrix ViewProjection;
@@ -36,6 +36,7 @@ struct FSceneRenderSettings
 {
 	bool bDrawPrimitives = true;
 	bool bDrawDecals = true;
+	EDecalRenderMode DecalRenderMode = EDecalRenderMode::ReceiverMesh;
 	bool bDrawShadows = true;
 	FShadowFilterSettings ShadowFilter;
 	bool bExponentialHeightFog = true;
@@ -60,12 +61,12 @@ public:
 	void Init(FRenderer* InRenderer);
 	void BeginFrame();
 	void Render(UWorld& World, const FSceneView& SceneView, const FSceneRenderSettings& Settings,
-		const FRenderingInfo& SceneInfo, const FRenderingInfo& ViewInfo, FTexture2D* FxaaTemp, FRenderQueue& RenderQueue);
+		const FRenderingInfo& SceneInfo, const FRenderingInfo& ViewInfo, FTexture2D* DecalBaseColorTarget, FTexture2D* FxaaTemp, FRenderQueue& RenderQueue);
 
 private:
 	// 불투명 물체에 대한 Pass
 	void RenderOpaquePass(const FSceneView& SceneView, const FSceneRenderSettings& Settings, const UWorld& ViewWorld,
-		const FRenderingInfo& SceneInfo, FRenderQueue& RenderQueue, const FDirectionalLightInfo& DirectionalLight);
+		const FRenderingInfo& SceneInfo, FRenderQueue& RenderQueue, const FDirectionalLightInfo& DirectionalLight, FTexture2D* DecalBaseColorTarget, const FFrustumPlanes& FrustumPlanes);
 	// 월드에 배치된 텍스트 그리기
 	void DrawWorldText(const FSceneView& SceneView, const UWorld& ViewWorld);
 	// 안개에 대한 Pass
@@ -79,6 +80,11 @@ private:
 	// Depth Pass
 	void RenderDepthPass(const FSceneView& SceneView, const FRenderingInfo& ViewInfo);
 
+	void RenderReceiverDecalPass(const FSceneView& SceneView, const FSceneRenderSettings& Settings, const UWorld& ViewWorld);
+	void RenderScreenSpaceDecalPass(const FSceneView& SceneView, const FSceneRenderSettings& Settings, const UWorld& ViewWorld,
+		const FRenderingInfo& SceneInfo, FTexture2D* OutputTarget, const FFrustumPlanes& FrustumPlanes, bool bRenderAsUnlit);
+	void RenderTranslucentPass(const FSceneView& SceneView, const FSceneRenderSettings& Settings, const UWorld& ViewWorld, const FRenderingInfo& SceneInfo);
+
 	FRenderer* Renderer = nullptr;
 	TUniquePtr<FSkyboxRenderer> SkyboxRenderer;
 	TUniquePtr<FFogRenderer> FogRenderer;
@@ -86,13 +92,10 @@ private:
 	TUniquePtr<FGammaEncodeRenderer> GammaEncodeRenderer;
 	TUniquePtr<FDepthViewRenderer> DepthViewRenderer;
 	TUniquePtr<FTextRenderer> TextRenderer;
-
+	TUniquePtr<FDecalRenderer> DecalRenderer;
+	TUniquePtr<FScreenSpaceDecalRenderer> ScreenSpaceDecalRenderer;
 	// 여러 View가 아틀라스 하나를 같이 쓰므로 마지막으로 그린 내용을 기억한다.
 	const UWorld* ShadowAtlasWorld = nullptr;
 	TArray<FShadowInfo> ShadowAtlasInfos;
 	bool bShadowAtlasRenderedThisFrame = false;
-
-	void RenderDecalPass(const FSceneView& SceneView, const FSceneRenderSettings& Settings, const UWorld& ViewWorld);
-
-	TUniquePtr<FDecalRenderer> DecalRenderer;
 };

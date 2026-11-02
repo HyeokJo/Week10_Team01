@@ -16,6 +16,7 @@ struct FEditorSettings
 	// Show: 화면에 무엇을 그릴지
 	bool bDrawPrimitives = true;
 	bool bDrawDecals = true;
+	int32 DecalRenderMode = static_cast<int32>(EDecalRenderMode::ReceiverMesh);
 	bool bDrawBoundingBox = false;
 	bool bShowUUID = false;
 	bool bDrawGrid = true;

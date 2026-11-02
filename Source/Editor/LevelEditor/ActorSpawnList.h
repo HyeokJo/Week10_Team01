@@ -13,6 +13,7 @@
 #include "GameFramework/PlayerStart.h"
 #include "GameFramework/Actor/PlayerActor.h"
 #include "GameFramework/Actor/DecalActor.h"
+#include "GameFramework/Actor/FakeSpotLightActor.h"
 #include "GameFramework/Actor/EnemyActor.h"
 #include "Game/Coin.h"
 #include "Game/CoinLauncher.h"
@@ -50,4 +51,5 @@ inline constexpr FSpawnableActorType SpawnableActorTypes[] =
 	{ "DefaultPawn",          &ADefaultPawn::StaticClass },
 	{ "PlayerStart",          &APlayerStart::StaticClass },
 	{ "Decal",                &ADecalActor::StaticClass },
+	{ "Fake Spot Light",      &AFakeSpotLightActor::StaticClass },
 };

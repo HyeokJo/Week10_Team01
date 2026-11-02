@@ -39,6 +39,7 @@
 #include "GameFramework/PlayerController.h"
 
 #include "Component/ShapeComponent.h"
+#include "Component/DecalComponent.h"
 #include "Engine/GameViewportClient.h"
 
 namespace
@@ -485,6 +486,7 @@ void UEditorEngine::RenderMultipleViewports()
 			*ViewWorld,
 			ViewportsPanel->GetSceneRenderingInfo(ViewIndex),
 			ViewportsPanel->GetRenderingInfo(ViewIndex),
+			ViewportsPanel->GetDecalBaseColorTarget(ViewIndex),
 			GetFxaaTargetForView(ViewIndex),
 			RenderQueue);
 
@@ -516,6 +518,7 @@ void UEditorEngine::RenderMultipleViewports()
 			*ViewWorld,
 			PIETargets.SceneInfo,
 			PIETargets.ViewInfo,
+			PIETargets.DecalBaseColor.get(),
 			GetFxaaTargetForView(PIEViewIndex),
 			RenderQueue);
 
@@ -614,6 +617,7 @@ FSceneRenderSettings UEditorEngine::MakeSceneRenderSettings() const
 	return {
 		.bDrawPrimitives = Settings.bDrawPrimitives,
 		.bDrawDecals = Settings.bDrawDecals,
+		.DecalRenderMode = static_cast<EDecalRenderMode>(Settings.DecalRenderMode),
 		.bDrawShadows = Settings.bDrawShadows,
 		.ShadowFilter = Filter,
 		.bExponentialHeightFog = Settings.bExponentialHeightFog,
@@ -727,6 +731,14 @@ void UEditorEngine::RenderOverlayPass(const int32 ViewIndex, UWorld& ViewWorld, 
 				continue;
 			if (Selection.IsSelected(Owner) || LocalLight->ShouldAlwaysDrawDebug())
 				LocalLight->DrawDebug(LineBatcher.get());
+		}
+		for (TObjectIterator<UDecalComponent> Decal; Decal; ++Decal)
+		{
+			AActor* Owner = Decal->GetOwner();
+			if (!Owner || Owner->GetWorld() != &ViewWorld)
+				continue;
+			if (Selection.IsSelected(Owner))
+				Decal->DrawDebug(LineBatcher.get());
 		}
 	}
 
@@ -1073,7 +1085,7 @@ void UEditorEngine::PasteCopiedActors()
 
 // View 하나의 씬을 그린다.
 void UEditorEngine::RenderFrame(const FSceneView& SceneView, const FSceneRenderSettings& Settings, UWorld& ViewWorld, 
-	const FRenderingInfo& SceneRenderingInfo, const FRenderingInfo& ViewRenderingInfo, FTexture2D* FxaaTexture, FRenderQueue& InRenderQueue)
+	const FRenderingInfo& SceneRenderingInfo, const FRenderingInfo& ViewRenderingInfo, FTexture2D* DecalBaseColorTarget, FTexture2D* FxaaTexture, FRenderQueue& InRenderQueue)
 {
 	FSceneRenderSettings ViewSettings = Settings;
 	FSceneView View = SceneView;
@@ -1109,7 +1121,7 @@ void UEditorEngine::RenderFrame(const FSceneView& SceneView, const FSceneRenderS
 		}
 	}
 
-	SceneRenderer.Render(ViewWorld, View, ViewSettings, SceneRenderingInfo, ViewRenderingInfo, FxaaTexture, InRenderQueue);
+	SceneRenderer.Render(ViewWorld, View, ViewSettings, SceneRenderingInfo, ViewRenderingInfo, DecalBaseColorTarget, FxaaTexture, InRenderQueue);
 }
 
 // View Texture가 포함된 UI를 Swapchain 백버퍼에 합성한다. Present는 FEngineLoop가 한다.

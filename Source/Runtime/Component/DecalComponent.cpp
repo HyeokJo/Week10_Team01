@@ -4,6 +4,8 @@
 #include "Engine/DecalSceneProxy.h"
 #include "Engine/World.h"
 #include "GameFramework/Actor.h"
+#include "Render/Material.h"
+#include "Render/LineBatcher.h"
 
 UDecalComponent::UDecalComponent()
 {
@@ -15,6 +17,8 @@ void UDecalComponent::BeginPlay()
 	Super::BeginPlay();
 	ValidateParameters();
 	ElapsedTime = 0.f;
+	ManualFadeOpacity = 1.f;
+	bManualFadePlaying = false;
 	bFadePlaying = true;
 	MarkSceneProxyDirty();
 }
@@ -22,6 +26,7 @@ void UDecalComponent::BeginPlay()
 void UDecalComponent::EndPlay()
 {
 	bFadePlaying = false;
+	bManualFadePlaying = false;
 	ElapsedTime = 0.f;
 	MarkSceneProxyDirty();
 	Super::EndPlay();
@@ -30,6 +35,14 @@ void UDecalComponent::EndPlay()
 void UDecalComponent::TickComponent(float DeltaTime)
 {
 	Super::TickComponent(DeltaTime);
+	if (bManualFadePlaying)
+	{
+		ManualFadeElapsed += FMath::Max(DeltaTime, 0.f);
+		const float Alpha = FMath::Clamp(ManualFadeElapsed / ManualFadeDuration, 0.f, 1.f);
+		ManualFadeOpacity = ManualFadeStartOpacity + (ManualFadeTargetOpacity - ManualFadeStartOpacity) * Alpha;
+		bManualFadePlaying = Alpha < 1.f;
+		MarkSceneProxyDirty();
+	}
 	if (!bFadePlaying)
 		return;
 
@@ -104,11 +117,15 @@ void UDecalComponent::SetHiddenInGame(bool bInHidden)
 void UDecalComponent::Serialize(FStructuredArchive::FRecord Record)
 {
 	Super::Serialize(Record);
+	if (auto Slot = Record.TryEnterField("DecalMaterial", true))
+		UMaterial::SerializeMaterialReference(Slot.GetValue(), DecalMaterial);
 	if (Record.GetUnderlyingArchive().IsLoading())
 	{
 		ValidateParameters();
 		ElapsedTime = 0.f;
 		bFadePlaying = false;
+		ManualFadeOpacity = 1.f;
+		bManualFadePlaying = false;
 		MarkSceneProxyDirty();
 	}
 }
@@ -133,4 +150,66 @@ void UDecalComponent::ValidateParameters()
 	FadeInDuration = FMath::Max(FadeInDuration, 0.f);
 	FadeStartDelay = FMath::Max(FadeStartDelay, 0.f);
 	FadeDuration = FMath::Max(FadeDuration, 0.f);
+	FadeOutDuration = FMath::Max(FadeOutDuration, 0.f);
+}
+
+void UDecalComponent::Serialize(json& Handle, bool bIsLoading)
+{
+	Super::Serialize(Handle, bIsLoading);
+	if (bIsLoading)
+	{
+		if (Handle.contains("DecalMaterial"))
+			DecalMaterial = Handle["DecalMaterial"].is_object() ? UMaterial::LoadMaterial(Handle["DecalMaterial"]) : nullptr;
+		ValidateParameters();
+		MarkSceneProxyDirty();
+	}
+	else
+		Handle["DecalMaterial"] = DecalMaterial ? UMaterial::SaveMaterial(DecalMaterial) : json(nullptr);
+}
+
+void UDecalComponent::SetDecalSize(const FVector& InSize)
+{
+	DecalSize = InSize;
+	ValidateParameters();
+	MarkSceneProxyDirty();
+}
+
+void UDecalComponent::SetOpacity(float InOpacity)
+{
+	Opacity = FMath::Clamp(InOpacity, 0.f, 1.f);
+	MarkSceneProxyDirty();
+}
+
+void UDecalComponent::FadeIn() { StartManualFade(1.f, FadeInDuration); }
+void UDecalComponent::FadeOut() { StartManualFade(0.f, FadeOutDuration); }
+
+void UDecalComponent::StartManualFade(float TargetOpacity, float Duration)
+{
+	ManualFadeStartOpacity = ManualFadeOpacity;
+	ManualFadeTargetOpacity = TargetOpacity;
+	ManualFadeElapsed = 0.f;
+	ManualFadeDuration = FMath::Max(Duration, 0.f);
+	bManualFadePlaying = ManualFadeDuration > 0.f;
+	if (!bManualFadePlaying)
+		ManualFadeOpacity = TargetOpacity;
+	MarkSceneProxyDirty();
+}
+
+void UDecalComponent::DrawDebug(FLineBatcher* LineBatcher) const
+{
+	if (!LineBatcher)
+	{
+		return;
+	}
+	const FVector4 Color(0.1f, 0.85f, 1.0f, 1.0f);
+	LineBatcher->AddOrientedBox(CalcLocalBounds(), GetWorldMatrix(), Color);
+	const FMatrix World = GetWorldMatrix();
+	const FVector Forward = FVector(World[0][0], World[0][1], World[0][2]).GetSafeNormal();
+	const float HalfLength = DecalSize.X * std::fabs(GetWorldScale3D().X);
+	const FVector Start = GetWorldLocation() - Forward * HalfLength;
+	const float Length = HalfLength * 2.0f;
+	if (Length > 0.01f)
+	{
+		LineBatcher->AddArrow(Start, Forward, 2, 0.1f, std::min(2 * 0.1f, 12.0f), Color);
+	}
 }

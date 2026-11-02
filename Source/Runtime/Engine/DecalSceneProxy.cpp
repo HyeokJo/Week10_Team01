@@ -2,6 +2,7 @@
 #include "Component/DecalComponent.h"
 #include "DecalSceneProxy.h"
 #include "Asset/AssetManager.h"
+#include "Render/Material.h"
 
 void FDecalSceneProxy::UpdateFromComponent()
 {
@@ -9,6 +10,7 @@ void FDecalSceneProxy::UpdateFromComponent()
 	WorldToDecal = DecalToWorld.Inverse();
 
 	DecalSize = Component->GetDecalSize();
+	UMaterial* Material = Component->GetDecalMaterial();
 	const FString& NewTexturePath = Component->GetTexturePath();
 
 	if (TexturePath != NewTexturePath || !Texture)
@@ -16,6 +18,8 @@ void FDecalSceneProxy::UpdateFromComponent()
 		TexturePath = NewTexturePath;
 		Texture = TexturePath.empty() ? nullptr : UAssetManager::Get().LoadTexture(TexturePath);
 	}
+	if (TexturePath.empty())
+		Texture = Material && Material->Textures.Num() > 0 ? Material->Textures[0] : nullptr;
 	const FString& NewNormalTexturePath = Component->GetNormalTexturePath();
 	if (NormalTexturePath != NewNormalTexturePath || (!NormalTexturePath.empty() && !NormalTexture))
 	{
@@ -23,8 +27,23 @@ void FDecalSceneProxy::UpdateFromComponent()
 		NormalTexture = NormalTexturePath.empty() ? nullptr : UAssetManager::Get().LoadTexture(NormalTexturePath, true, false);
 	}
 	bFlipNormalGreen = Component->IsNormalGreenFlipped();
+	if (NormalTexturePath.empty())
+	{
+		NormalTexture = Material && Material->Textures.Num() > 1 ? Material->Textures[1] : nullptr;
+		if (Material) bFlipNormalGreen = Material->bFlipNormalGreen;
+	}
 	Opacity = Component->GetRenderOpacity();
 	DecalColor = Component->GetDecalColor();
+	if (Material)
+	{
+		DecalColor.R *= Material->BaseColor.R;
+		DecalColor.G *= Material->BaseColor.G;
+		DecalColor.B *= Material->BaseColor.B;
+		DecalColor.A *= Material->BaseColor.A;
+	}
+	SamplerState = Material ? Material->SamplerState : ESamplerState::LinearClamp;
+	bRenderAsUnlit = Component->IsRenderAsUnlit();
+	ProjectionEndFade = Component->GetProjectionEndFade();
 	SortOrder = Component->GetSortOrder();
 	FadeScreenSize = Component->GetFadeScreenSize();
 	bHiddenInGame = Component->IsHiddenInGame();
