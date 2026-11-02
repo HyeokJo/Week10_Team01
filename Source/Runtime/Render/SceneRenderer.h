@@ -78,7 +78,8 @@ private:
 	// Depth Pass
 	void RenderDepthPass(const FSceneView& SceneView, const FRenderingInfo& ViewInfo);
 
-	void RenderDecalPass(const FSceneView& SceneView, const FSceneRenderSettings& Settings, const UWorld& ViewWorld, const FRenderingInfo& SceneInfo, FTexture2D* DecalBaseColorTarget, const FFrustumPlanes& FrustumPlanes);
+	void RenderDecalPass(const FSceneView& SceneView, const FSceneRenderSettings& Settings, const UWorld& ViewWorld,
+		const FRenderingInfo& SceneInfo, FTexture2D* OutputTarget, const FFrustumPlanes& FrustumPlanes, bool bRenderAsUnlit);
 	void RenderTranslucentPass(const FSceneView& SceneView, const FSceneRenderSettings& Settings, const UWorld& ViewWorld, const FRenderingInfo& SceneInfo);
 
 	FRenderer* Renderer = nullptr;

@@ -30,6 +30,9 @@ public:
 	float GetOpacity() const { return Opacity * FadeOpacity; }
 	void SetOpacity(float InOpacity);
 
+	void SetRenderAsUnlit(bool bEnable) { bRenderAsUnlit = bEnable; }
+	bool IsRenderAsUnlit() const { return bRenderAsUnlit; }
+
 	UMaterial* GetDecalMaterial() const { return DecalMaterial; }
 	void SetDecalMaterial(UMaterial* InMaterial) { DecalMaterial = InMaterial; }
 
@@ -68,4 +71,5 @@ private:
 	void SetFadeTickEnabled(bool bEnable);
 	void MarkDecalBoundsDirty();
 	float ProjectionEndFade = 0.0f;
+	bool bRenderAsUnlit = false;
 };

@@ -8,8 +8,8 @@
 AFakeSpotLightActor::AFakeSpotLightActor()
 {
     DecalComponent = CreateDefaultSubobject<UDecalComponent>("UDecalComponent");
+    DecalComponent->SetRenderAsUnlit(true);
     DecalComponent->SetupAttachment(GetRootComponent());
-
     BillboardComponent = CreateDefaultSubobject<UBillboardComponent>("UBillboardComponent");
     BillboardComponent->SetupAttachment(GetRootComponent());
     BillboardComponent->SetHiddenInDetails(true);

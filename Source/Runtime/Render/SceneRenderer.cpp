@@ -131,6 +131,15 @@ void FSceneRenderer::Render(UWorld& World, const FSceneView& SceneView, const FS
 	const EViewMode ViewMode = SceneView.RenderMode.ViewMode;
 	const bool bVisualizeData = IsDataVisualization(ViewMode);
 
+	const bool bCanRenderUnlitDecals = Settings.bDrawDecals && !Settings.bDepthView && !bVisualizeData && !Settings.bVisualizeCascades && !Settings.bVisualizeTileLightCount &&
+		Settings.bDrawPrimitives && DecalBaseColorTarget != nullptr && SceneInfo.ColorRenderTargets.Num() > 0 && SceneInfo.ColorRenderTargets[0].Texture != nullptr;
+
+	if (bCanRenderUnlitDecals)
+	{
+		FTexture2D* SceneColorTarget = SceneInfo.ColorRenderTargets[0].Texture;
+		RenderDecalPass(SceneView, Settings, World, SceneInfo, SceneColorTarget, FrustumPlanes, true);
+	}
+
 	RenderTranslucentPass(SceneView, Settings, World, SceneInfo);
 
 	if (Settings.bDepthView)
@@ -223,7 +232,7 @@ void FSceneRenderer::RenderOpaquePass(const FSceneView& SceneView, const FSceneR
 
 		RenderCommand::EndRenderPass();
 
-		RenderDecalPass(SceneView, Settings, ViewWorld, SceneInfo, DecalBaseColorTarget, FrustumPlanes);
+		RenderDecalPass(SceneView, Settings, ViewWorld, SceneInfo, DecalBaseColorTarget, FrustumPlanes, false);
 
 		Renderer->BindShadowForShading();
 
@@ -380,7 +389,8 @@ void FSceneRenderer::RenderDepthPass(const FSceneView& SceneView, const FRenderi
 	RenderCommand::EndRenderPass();
 }
 
-void FSceneRenderer::RenderDecalPass(const FSceneView& SceneView, const FSceneRenderSettings& Settings, const UWorld& ViewWorld, const FRenderingInfo& SceneInfo, FTexture2D* DecalBaseColorTarget, const FFrustumPlanes& FrustumPlanes)
+void FSceneRenderer::RenderDecalPass(const FSceneView& SceneView, const FSceneRenderSettings& Settings, const UWorld& ViewWorld,
+	const FRenderingInfo& SceneInfo, FTexture2D* OutputTarget, const FFrustumPlanes& FrustumPlanes, bool bRenderAsUnlit)
 {
 	const uint64 StartCycles = FPlatformTime::GetCycles64();
 
@@ -403,6 +413,11 @@ void FSceneRenderer::RenderDecalPass(const FSceneView& SceneView, const FSceneRe
 			continue;
 		}
 
+		if (Decal->IsRenderAsUnlit() != bRenderAsUnlit)
+		{
+			continue;
+		}
+
 		if (bIsGameWorld && Decal->IsHiddenInGame())
 		{
 			++DecalStats.NumHiddenDecals;
@@ -415,7 +430,10 @@ void FSceneRenderer::RenderDecalPass(const FSceneView& SceneView, const FSceneRe
 	if (!Settings.bDrawPrimitives || Decals.IsEmpty())
 	{
 		UpdatePassTime();
-		FStatOverlay::SetDecalStats(DecalStats);
+		if (!bRenderAsUnlit)
+		{
+			FStatOverlay::SetDecalStats(DecalStats);
+		}
 		return;
 	}
 
@@ -425,9 +443,16 @@ void FSceneRenderer::RenderDecalPass(const FSceneView& SceneView, const FSceneRe
 	FRenderingInfo PassInfo{};
 	PassInfo.ViewportSetting = SceneInfo.ViewportSetting;
 	FRenderingDesc DecalColorDesc{};
-	DecalColorDesc.Texture = DecalBaseColorTarget;
-	DecalColorDesc.LoadOp = ERenderTargetLoadOp::Clear;
-	DecalColorDesc.ClearValue.ColorClearValue = FVector4(0.0f, 0.0f, 0.0f, 0.0f);
+	DecalColorDesc.Texture = OutputTarget;
+	if (bRenderAsUnlit)
+	{
+		DecalColorDesc.LoadOp = ERenderTargetLoadOp::Load;
+	}
+	else
+	{
+		DecalColorDesc.LoadOp = ERenderTargetLoadOp::Clear;
+		DecalColorDesc.ClearValue.ColorClearValue = FVector4(0.0f, 0.0f, 0.0f, 0.0f);
+	}
 	PassInfo.ColorRenderTargets.Add(DecalColorDesc);
 
 	PassInfo.DepthStencil.Texture = nullptr;
@@ -455,6 +480,11 @@ void FSceneRenderer::RenderDecalPass(const FSceneView& SceneView, const FSceneRe
 	ViewWorld.GetScene().GetDecalBVH().QueryCull(FrustumAllPlanesMask, ClassifyBounds, [&](UDecalComponent* Decal)
 		{
 			if (!Decal)
+			{
+				return;
+			}
+
+			if (Decal->IsRenderAsUnlit() != bRenderAsUnlit)
 			{
 				return;
 			}
@@ -492,7 +522,10 @@ void FSceneRenderer::RenderDecalPass(const FSceneView& SceneView, const FSceneRe
 	RenderCommand::UnbindShaderResource(2, EShaderBindFlagBits::Pixel);
 
 	UpdatePassTime();
-	FStatOverlay::SetDecalStats(DecalStats);
+	if (!bRenderAsUnlit)
+	{
+		FStatOverlay::SetDecalStats(DecalStats);
+	}
 }
 
 void FSceneRenderer::RenderTranslucentPass(const FSceneView& SceneView, const FSceneRenderSettings& Settings, const UWorld& ViewWorld, const FRenderingInfo& SceneInfo)
