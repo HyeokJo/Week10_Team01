@@ -9,6 +9,9 @@
 #include "Render/RenderPacket.h"
 #include "Render/RenderResourceManager.h"
 #include "Render/Texture2D.h"
+#include "Render/ColorWorkflow.h"
+#include "Render/Renderer.h"
+#include "Render/SceneRenderer.h"
 
 bool FDecalRenderer::Init()
 {
@@ -73,7 +76,7 @@ float FDecalRenderer::CalculateScreenFade(const FDecalSceneProxy& Decal, const F
 	return Alpha * Alpha * (3.f - 2.f * Alpha);
 }
 
-void FDecalRenderer::OnRender(const FRenderPacket& Receiver, const FDecalSceneProxy& Decal, const FMatrix& ViewProjection, float ScreenFade)
+void FDecalRenderer::OnRender(const FRenderPacket& Receiver, const FDecalSceneProxy& Decal, const FSceneView& SceneView, float ScreenFade)
 {
 	UTexture2D* DecalTexture = Decal.GetTexture();
 
@@ -86,11 +89,19 @@ void FDecalRenderer::OnRender(const FRenderPacket& Receiver, const FDecalScenePr
 	
 	Constants.World = Receiver.Proxy ? Receiver.Proxy->GetLocalToWorld() : (Receiver.Model ? *Receiver.Model : FMatrix::Identity);
 
-	Constants.ViewProjection = ViewProjection;
+	Constants.ViewProjection = SceneView.ViewProjection;
 	Constants.WorldToDecal = Decal.GetWorldToDecal();
+	Constants.NormalMatrix = Receiver.Proxy ? Receiver.Proxy->GetNormalMatrix() : MakeNormalMatrix(Constants.World);
 	Constants.DecalSize = Decal.GetDecalSize();
 	Constants.Opacity = Decal.GetOpacity() * ScreenFade;
-	Constants.DecalColor = Decal.GetDecalColor();
+	Constants.DecalColor = ColorWorkflow::ToShaderColor(Decal.GetDecalColor());
+	Constants.CameraPosition = SceneView.Location;
+	Constants.Shininess = Receiver.Material->Shininess;
+	const FLinearColor Specular = ColorWorkflow::ToShaderColor(Receiver.Material->SpecularColor);
+	Constants.SpecularColor = FVector(Specular.R, Specular.G, Specular.B);
+	Constants.bLit = SceneView.RenderMode.ViewMode == EViewMode::Lit ? 1u : 0u;
+	Constants.LightingModel = static_cast<uint32>(SceneView.RenderMode.LightingModel);
+	Constants.bReceiveShadow = !Receiver.Proxy || Receiver.Proxy->IsReceiveShadow() ? 1u : 0u;
 
 	RenderCommand::BindMesh(Receiver.Mesh, Receiver.LODIndex);
 	RenderCommand::BindPipelineState(PipelineState);

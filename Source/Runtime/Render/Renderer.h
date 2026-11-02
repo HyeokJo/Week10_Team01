@@ -20,6 +20,7 @@ class FDecalRenderer;
 class FDecalSceneProxy;
 
 struct FShadowStats;
+struct FSceneView;
 
 constexpr uint32 ObjectSlotBytes = 256;
 
@@ -85,7 +86,7 @@ public:
 	void RenderOpaque(const FMatrix& ViewProjection);
 
 	void PrepareDecalReceivers();
-	void RenderDecal(FDecalRenderer& DecalRenderer, const FScene& Scene, const FDecalSceneProxy& Decal, const FMatrix& ViewProjection, float ScreenFade);
+	void RenderDecal(FDecalRenderer& DecalRenderer, const FScene& Scene, const FDecalSceneProxy& Decal, const FSceneView& SceneView, float ScreenFade);
 
 	// Gather 전에 World가 불러 가려진 물체를 거른다.
 	FGPUOcclusion& GetGPUOcclusion() { return GPUOcclusion; }

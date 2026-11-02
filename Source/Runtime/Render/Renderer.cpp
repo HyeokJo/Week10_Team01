@@ -158,6 +158,11 @@ void FRenderer::RenderOpaque(const FMatrix& ViewProjection)
 
 void FRenderer::PrepareDecalReceivers()
 {
+	// The decal shader owns b0; shared lighting uses b3-b6 and t2-t12.
+	RenderCommand::BindConstantBuffer(3, LightingCB.get(), EShaderBindFlagBits::Pixel);
+	TileLightCulling.BindForShading(LocalLight);
+	BindShadowForShading();
+
 	DecalReceivers.clear();
 	const auto AddReceiver = [&](const FRenderPacket& Receiver)
 	{
@@ -197,7 +202,7 @@ void FRenderer::PrepareDecalReceivers()
 	}
 }
 
-void FRenderer::RenderDecal(FDecalRenderer& DecalRenderer, const FScene& Scene, const FDecalSceneProxy& Decal, const FMatrix& ViewProjection, float ScreenFade)
+void FRenderer::RenderDecal(FDecalRenderer& DecalRenderer, const FScene& Scene, const FDecalSceneProxy& Decal, const FSceneView& SceneView, float ScreenFade)
 {
 	const FBox& DecalBounds = Decal.GetBounds();
 	Scene.BVH.Query(
@@ -212,7 +217,7 @@ void FRenderer::RenderDecal(FDecalRenderer& DecalRenderer, const FScene& Scene, 
 				return;
 
 			for (const FRenderPacket& Packet : Receiver->second)
-				DecalRenderer.OnRender(Packet, Decal, ViewProjection, ScreenFade);
+				DecalRenderer.OnRender(Packet, Decal, SceneView, ScreenFade);
 		});
 }
 

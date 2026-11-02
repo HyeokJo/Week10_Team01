@@ -368,7 +368,7 @@ void FSceneRenderer::RenderDecalPass(const FSceneView& SceneView, const FSceneRe
 		}
 
 		FStatOverlay::AddDecalSubmission();
-		Renderer->RenderDecal(*DecalRenderer, ViewWorld.GetScene(), *Decal, SceneView.ViewProjection, ScreenFade);
+		Renderer->RenderDecal(*DecalRenderer, ViewWorld.GetScene(), *Decal, SceneView, ScreenFade);
 	}
 
 	const uint64 ElapsedCycles = FPlatformTime::GetCycles64() - StartCycles;
