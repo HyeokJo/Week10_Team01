@@ -8,6 +8,9 @@ void FDecalSceneProxy::UpdateFromComponent()
 {
 	DecalToWorld = Component->GetWorldMatrix();
 	WorldToDecal = DecalToWorld.Inverse();
+	ProjectionDirection = FVector(DecalToWorld.M[0][0], DecalToWorld.M[0][1], DecalToWorld.M[0][2]).GetSafeNormal();
+	AngleFadeCosines = FVector2(std::cos(FMath::DegreesToRadians(Component->GetAngleFadeEnd())),
+		std::cos(FMath::DegreesToRadians(Component->GetAngleFadeStart())));
 
 	DecalSize = Component->GetDecalSize();
 	UMaterial* Material = Component->GetDecalMaterial();

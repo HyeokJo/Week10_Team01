@@ -142,6 +142,8 @@ void UDecalComponent::ValidateParameters()
 	DecalSize.Z = FMath::Max(DecalSize.Z, 0.01f);
 	Opacity = FMath::Clamp(Opacity, 0.0f, 1.0f);
 	FadeScreenSize = FMath::Max(FadeScreenSize, 0.f);
+	AngleFadeStart = FMath::Clamp(AngleFadeStart, 0.f, 89.9f);
+	AngleFadeEnd = FMath::Clamp(AngleFadeEnd, AngleFadeStart + 0.1f, 90.f);
 	DecalColor.R = FMath::Max(DecalColor.R, 0.f);
 	DecalColor.G = FMath::Max(DecalColor.G, 0.f);
 	DecalColor.B = FMath::Max(DecalColor.B, 0.f);
@@ -177,6 +179,14 @@ void UDecalComponent::SetDecalSize(const FVector& InSize)
 void UDecalComponent::SetOpacity(float InOpacity)
 {
 	Opacity = FMath::Clamp(InOpacity, 0.f, 1.f);
+	MarkSceneProxyDirty();
+}
+
+void UDecalComponent::SetAngleFade(float InStartDegrees, float InEndDegrees)
+{
+	AngleFadeStart = InStartDegrees;
+	AngleFadeEnd = InEndDegrees;
+	ValidateParameters();
 	MarkSceneProxyDirty();
 }
 

@@ -469,14 +469,8 @@ void FSceneRenderer::RenderScreenSpaceDecalPass(const FSceneView& SceneView, con
     PassInfo.ColorRenderTargets.Add(Color);
     PassInfo.DepthStencil.Texture = nullptr;
     RenderCommand::BeginRenderPass(PassInfo);
-    for (const FDecalSceneProxy* Decal : Decals)
-    {
-        const float Fade = FDecalRenderer::CalculateScreenFade(*Decal, SceneView.ViewProjection, SceneView.bOrthographic);
-        if (Fade <= 0.f) continue;
-        FStatOverlay::AddDecalSubmission();
-        if (ScreenSpaceDecalRenderer->OnRender(SceneInfo.DepthStencil.Texture, SceneView.ViewProjection, *Decal, SceneInfo.ViewportSetting, Fade))
-            FStatOverlay::AddDecalDrawCall();
-    }
+    ScreenSpaceDecalRenderer->OnRender(SceneInfo.DepthStencil.Texture, SceneView.ViewProjection, Decals,
+        SceneInfo.ViewportSetting, SceneView.bOrthographic);
     RenderCommand::EndRenderPass();
     RenderCommand::SetRasterizerState(ERasterizerState::SolidBack);
     RenderCommand::UnbindShaderResource(0, EShaderBindFlagBits::Pixel);

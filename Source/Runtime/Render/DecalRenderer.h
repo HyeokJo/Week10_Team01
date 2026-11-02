@@ -30,9 +30,13 @@ struct FDecalConstants
 	FVector2 ReceiverUVOffset;
 	uint32 bFlipReceiverNormalGreen;
 	uint32 bFlipDecalNormalGreen;
+	FVector ProjectionDirection;
+	float AngleFadeCosEnd;
+	float AngleFadeCosStart;
+	FVector AngleFadePadding;
 };
 
-static_assert(sizeof(FDecalConstants) == 352);
+static_assert(sizeof(FDecalConstants) == 384);
 
 class FDecalRenderer
 {

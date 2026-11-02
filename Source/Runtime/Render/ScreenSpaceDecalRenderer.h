@@ -2,34 +2,59 @@
 
 #include "Buffer.h"
 #include "PipelineState.h"
+#include "Containers/Array.h"
 
 #include "Math/Color.h"
 class FDecalSceneProxy;
 class FTexture2D;
+class UTexture2D;
 struct FViewportSettings;
 
-struct FScreenSpaceDecalConstants
+struct FScreenSpaceDecalViewConstants
 {
     FMatrix InverseViewProjection;
-    FMatrix WorldToDecal;
+    FVector2 ViewportOrigin;
+    FVector2 InverseViewportSize;
+};
+static_assert(sizeof(FScreenSpaceDecalViewConstants) == 80);
 
+struct FScreenSpaceDecalInstance
+{
+    FMatrix WorldToDecal;
     FVector DecalSize;
     float Opacity;
-
     FLinearColor BaseColor;
-
+    FVector4 ScreenRect;
+    FVector ProjectionDirection;
     float ProjectionEndFade;
-    FVector Padding;
+    FVector2 AngleFadeCosines;
+    FVector2 Padding;
 };
-static_assert(sizeof(FScreenSpaceDecalConstants) == 176);
+static_assert(sizeof(FScreenSpaceDecalInstance) == 144);
 
 class FScreenSpaceDecalRenderer
 {
 public:
     bool Init();
-    bool OnRender(FTexture2D* DepthTexture, const FMatrix& ViewProjection, const FDecalSceneProxy& Decal, const FViewportSettings& Viewport, float ScreenFade);
+    void OnRender(FTexture2D* DepthTexture, const FMatrix& ViewProjection, const TArray<const FDecalSceneProxy*>& Decals,
+        const FViewportSettings& Viewport, bool bOrthographic);
 private:
+    struct FBatch
+    {
+        UTexture2D* Texture;
+        ESamplerState Sampler;
+        uint32 FirstInstance;
+        uint32 InstanceCount;
+    };
+
+    bool EnsureInstanceCapacity(uint32 Count);
     FPipelineState PipelineState;
     FShaderProgram* Shader = nullptr;
-    TUniquePtr<FConstantBuffer> ConstantBuffer;
+    TUniquePtr<FConstantBuffer> ViewConstantBuffer;
+    TUniquePtr<FConstantBuffer> BatchConstantBuffer;
+    ComPtr<ID3D11Buffer> InstanceBuffer;
+    ComPtr<ID3D11ShaderResourceView> InstanceSRV;
+    uint32 InstanceCapacity = 0;
+    TArray<FScreenSpaceDecalInstance> Instances;
+    TArray<FBatch> Batches;
 };

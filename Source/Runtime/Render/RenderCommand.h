@@ -50,6 +50,7 @@ public:
 	static void BindShaderProgram(FShaderProgram* Shader);
 
 	static void Draw(uint32 VertexCount, uint32 StartIndexLocation = 0);
+	static void DrawInstanced(uint32 VertexCountPerInstance, uint32 InstanceCount);
 	static void DrawIndexed(uint32 IndexCount, uint32 StartIndexLocation = 0, int32 BaseVertexLocation = 0);
 	static void DrawInstance(uint32 IndexCount, uint32 StartIndexLocation = 0, int32 BaseVertexLocation = 0);
 

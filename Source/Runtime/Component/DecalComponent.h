@@ -26,6 +26,8 @@ class UDecalComponent : public USceneComponent
 		PROPERTY(FadeDuration)
 		PROPERTY(bDestroyOwnerAfterFade)
 		PROPERTY(FadeOutDuration)
+		PROPERTY(AngleFadeStart)
+		PROPERTY(AngleFadeEnd)
 	REFLECT_END()
 
 public:
@@ -53,6 +55,9 @@ public:
 	void SetDecalMaterial(UMaterial* InMaterial) { DecalMaterial = InMaterial; MarkSceneProxyDirty(); }
 	void SetProjectionEndFade(float InFade) { ProjectionEndFade = FMath::Clamp(InFade, 0.f, 0.99f); MarkSceneProxyDirty(); }
 	float GetProjectionEndFade() const { return ProjectionEndFade; }
+	float GetAngleFadeStart() const { return AngleFadeStart; }
+	float GetAngleFadeEnd() const { return AngleFadeEnd; }
+	void SetAngleFade(float InStartDegrees, float InEndDegrees);
 	void DrawDebug(FLineBatcher* LineBatcher) const;
 
 	using Super::Serialize;
@@ -105,6 +110,9 @@ private:
 	int32 SortOrder = 0;
 	// Approximate projected diameter / view height. Zero disables screen-size fading.
 	float FadeScreenSize = 0.f;
+	// Angle from the projection axis: fully visible before Start, invisible at End.
+	float AngleFadeStart = 60.f;
+	float AngleFadeEnd = 80.f;
 
 	// Both delays are measured from BeginPlay. Zero duration makes an instant transition.
 	float FadeInStartDelay = 0.f;

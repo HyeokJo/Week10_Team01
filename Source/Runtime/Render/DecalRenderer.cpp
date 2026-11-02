@@ -109,6 +109,9 @@ void FDecalRenderer::OnRender(const FRenderPacket& Receiver, const FDecalScenePr
 	Constants.ReceiverUVOffset = Receiver.Material->UVScrollSpeed * EngineTimer::GetTotalTime();
 	Constants.bFlipReceiverNormalGreen = Receiver.Material->bFlipNormalGreen ? 1u : 0u;
 	Constants.bFlipDecalNormalGreen = Decal.IsNormalGreenFlipped() ? 1u : 0u;
+	Constants.ProjectionDirection = Decal.GetProjectionDirection();
+	Constants.AngleFadeCosEnd = Decal.GetAngleFadeCosines().X;
+	Constants.AngleFadeCosStart = Decal.GetAngleFadeCosines().Y;
 
 	RenderCommand::BindMesh(Receiver.Mesh, Receiver.LODIndex);
 	RenderCommand::BindPipelineState(PipelineState);

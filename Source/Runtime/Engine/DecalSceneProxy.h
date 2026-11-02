@@ -37,6 +37,8 @@ public:
 	bool IsRenderAsUnlit() const { return bRenderAsUnlit; }
 	float GetProjectionEndFade() const { return ProjectionEndFade; }
 	ESamplerState GetSamplerState() const { return SamplerState; }
+	const FVector& GetProjectionDirection() const { return ProjectionDirection; }
+	const FVector2& GetAngleFadeCosines() const { return AngleFadeCosines; }
 
 private:
 	friend class FScene;
@@ -63,4 +65,6 @@ private:
 	bool bRenderAsUnlit = false;
 	float ProjectionEndFade = 0.f;
 	ESamplerState SamplerState = ESamplerState::LinearClamp;
+	FVector ProjectionDirection = FVector(1.f, 0.f, 0.f);
+	FVector2 AngleFadeCosines;
 };

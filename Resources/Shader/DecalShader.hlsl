@@ -21,10 +21,15 @@ cbuffer DecalConstants : register(b0)
     float2 ReceiverUVOffset;
     uint bFlipReceiverNormalGreen;
     uint bFlipDecalNormalGreen;
+    float3 ProjectionDirection;
+    float AngleFadeCosEnd;
+    float AngleFadeCosStart;
+    float3 AngleFadePadding;
 };
 
 #define USE_NORMAL_MAP 1
 #include "LightingCommon.hlsli"
+#include "DecalCommon.hlsli"
 
 Texture2D DecalTexture : register(t0);
 Texture2D ReceiverNormalTexture : register(t1);
@@ -125,7 +130,12 @@ float4 mainPS(PSInput input) : SV_TARGET
     
     float4 Color = DecalTexture.SampleGrad(DecalSampler, DecalUV, DecalUVDX, DecalUVDY) * DecalColor;
     
-    Color.a *= Opacity;
+    // Geometric receiver normal controls coverage; normal maps only affect lighting.
+    float AngleFade = ComputeDecalAngleFade(input.WorldNormal, ProjectionDirection,
+        float2(AngleFadeCosEnd, AngleFadeCosStart));
+    Color.a *= Opacity * AngleFade;
+    if (AngleFade <= 0.0f)
+        discard;
 
     if (bLit != 0u)
     {
