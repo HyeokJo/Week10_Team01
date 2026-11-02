@@ -44,6 +44,7 @@ void FPrimitiveSceneProxy::UpdateRenderState()
     bVisible = Component->IsVisible();
     bCastShadow = Component->IsCastShadow();
     bReceiveShadow = Component->IsReceiveShadow();
+	bReceiveDecal = Component->IsReceiveDecal();
 	bHiddenInGame = Component->IsHiddenInGame();
     UStaticMeshComponent* StaticMeshComponent = Cast<UStaticMeshComponent>(Component);
     if (StaticMeshComponent) Mesh = StaticMeshComponent->GetStaticMesh();

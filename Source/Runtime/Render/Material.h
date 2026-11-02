@@ -4,7 +4,7 @@
 #include "Render/RenderStates.h"
 #include "Render/Texture2D.h"
 #include "Math/Color.h"
-
+#include "Render/Buffer.h"
 class FShader;
 
 

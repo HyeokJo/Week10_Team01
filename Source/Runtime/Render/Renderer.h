@@ -11,10 +11,16 @@
 #include "TileLightCulling.h"
 #include "LocalLight.h"
 #include "ShadowMapManager.h"
+#include <unordered_map>
 
+class FScene;
 class FPrimitiveSceneProxy;
 class FLightSceneProxy;
+class FDecalRenderer;
+class FDecalSceneProxy;
+
 struct FShadowStats;
+struct FSceneView;
 
 constexpr uint32 ObjectSlotBytes = 256;
 
@@ -64,6 +70,21 @@ struct FOcclusionMeasureResult
 	uint32 FalseCulls = 0;        // 그중 실제로는 픽셀이 보인 드로우 수. 0이어야 한다
 };
 
+struct FDecalCompositeConstants
+{
+	uint32 bEnableDecalBaseColor = 0;
+	uint32 bEnableDecalNormal = 0;
+	uint32 Padding[2] = {};
+};
+static_assert(sizeof(FDecalCompositeConstants) == 16);
+
+enum class EOpaquePassMode : uint8
+{
+	Normal,
+	DepthPrepass,
+	DepthReadOnly
+};
+
 class FRenderer
 {
 public:
@@ -78,6 +99,9 @@ public:
 
 	// 큐를 정렬해 불투명 패킷만 그린다. 반투명은 RenderTranslucent 호출 전까지 보관한다.
 	void RenderOpaque(const FMatrix& ViewProjection);
+
+	void PrepareDecalReceivers();
+	void RenderDecal(FDecalRenderer& DecalRenderer, const FScene& Scene, const FDecalSceneProxy& Decal, const FSceneView& SceneView, float ScreenFade);
 
 	// Gather 전에 World가 불러 가려진 물체를 거른다.
 	FGPUOcclusion& GetGPUOcclusion() { return GPUOcclusion; }
@@ -127,6 +151,10 @@ public:
 	//ImGui용 PreviewSRV 반환
 	//ID3D11ShaderResourceView* GetShadowPreviewSRV() const { return ShadowMapManager.GetPreviewSRV(); }
 
+	void SetOpaquePassMode(EOpaquePassMode Mode) { OpaquePassMode = Mode; }
+
+	void SetDecalTextures(FTexture2D* BaseColor, FTexture2D* Normal);
+
 private:
 	// FIFO 소비용 배열의 용량만 재사용하며 매 View의 패킷 값은 새로 채운다.
 	FRenderQueue RenderPackets;
@@ -161,6 +189,8 @@ private:
 
 	// 이번 프레임 스태틱 메시 묶음 (정렬 키 순). 비어 있지 않은 것만 담는다.
 	std::vector<const FStaticDrawGroup*> StaticGroups;
+	// Only opaque sections submitted for the current View, retaining their selected LOD and index range.
+	std::unordered_map<const FPrimitiveSceneProxy*, std::vector<FRenderPacket>> DecalReceivers;
 	void BindMaterial(UMaterial* material, bool bReceiveShadow);
 	void UpdateMaterialParams(const FRenderPacket& RenderPacket);
 	void UpdatePerObjectConstants(const FRenderPacket& RenderPacket, const FMatrix& ViewProjection);
@@ -173,4 +203,10 @@ private:
 	FShadowMapManager ShadowMapManager;
 	// Init()에서 CreateConstantBuffer(sizeof(FMatrix))
 	TUniquePtr<FConstantBuffer> ShadowViewCB;   
+
+	EOpaquePassMode OpaquePassMode = EOpaquePassMode::Normal;
+
+	TUniquePtr<FConstantBuffer> DecalCompositeCB;
+
+	void ApplyOpaquePassState(const UMaterial* Material, const FPrimitiveSceneProxy* Proxy);
 };

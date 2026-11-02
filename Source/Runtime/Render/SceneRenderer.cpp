@@ -17,6 +17,46 @@
 #include "GameFramework/Actor.h"
 #include "Text/TextRenderer.h"
 #include "UObject/UObjectIterator.h"
+#include "DecalRenderer.h"
+#include "Engine/DecalSceneProxy.h"
+#include "ScreenSpaceDecalRenderer.h"
+#include <unordered_set>
+#include "Core/StatOverlay.h"
+#include "Core/Windows/WindowsPlatformTime.h"
+namespace
+{
+    TArray<const FDecalSceneProxy*> GatherVisibleDecals(const FScene& Scene, const FFrustumPlanes& FrustumPlanes,
+        bool bGameView, bool bRenderAsUnlit)
+    {
+        std::unordered_set<const FDecalSceneProxy*> Candidates;
+        Scene.GetDecalBVH().QueryCull(FrustumAllPlanesMask,
+            [&FrustumPlanes](const FBox& Bounds, uint32& Mask)
+            {
+                switch (ClassifyBoxInFrustum(Bounds, FrustumPlanes, Mask))
+                {
+                case EFrustumTest::Outside: return EBVHCullResult::Outside;
+                case EFrustumTest::Intersect: return EBVHCullResult::Intersect;
+                case EFrustumTest::Inside: return EBVHCullResult::Inside;
+                }
+                return EBVHCullResult::Outside;
+            }, [&Candidates](const FDecalSceneProxy* Proxy) { Candidates.insert(Proxy); });
+
+        int32 Total = 0, Hidden = 0;
+        TArray<const FDecalSceneProxy*> Visible;
+        // Preserve scene registration order for decals with the same Sort Order.
+        for (const FDecalSceneProxy* Proxy : Scene.GetDecalProxies())
+        {
+            if (!Proxy || Proxy->IsRenderAsUnlit() != bRenderAsUnlit) continue;
+            ++Total;
+            if (bGameView && Proxy->IsHiddenInGame()) { ++Hidden; continue; }
+            if (Candidates.contains(Proxy)) Visible.Add(Proxy);
+        }
+        FStatOverlay::AddDecalVisibility(Total, Hidden, Total - Hidden - Visible.Num(), Visible.Num());
+        std::stable_sort(Visible.begin(), Visible.end(), [](const FDecalSceneProxy* A, const FDecalSceneProxy* B)
+            { return A->GetSortOrder() < B->GetSortOrder(); });
+        return Visible;
+    }
+}
 
 FSceneRenderer::FSceneRenderer() = default;
 
@@ -43,15 +83,21 @@ void FSceneRenderer::Init(FRenderer* InRenderer)
 
 	TextRenderer = MakeUnique<FTextRenderer>();
 	TextRenderer->Init();
+
+	DecalRenderer = MakeUnique<FDecalRenderer>();
+	DecalRenderer->Init();
+	ScreenSpaceDecalRenderer = MakeUnique<FScreenSpaceDecalRenderer>();
+	ScreenSpaceDecalRenderer->Init();
 }
 
 void FSceneRenderer::BeginFrame()
 {
 	bShadowAtlasRenderedThisFrame = false;
+	FStatOverlay::ResetDecalStats();
 }
 
 void FSceneRenderer::Render(UWorld& World, const FSceneView& SceneView, const FSceneRenderSettings& Settings,
-	const FRenderingInfo& SceneInfo, const FRenderingInfo& ViewInfo, FTexture2D* FxaaTemp, FRenderQueue& RenderQueue)
+	const FRenderingInfo& SceneInfo, const FRenderingInfo& ViewInfo, FTexture2D* DecalBaseColorTarget, FTexture2D* DecalNormalTarget, FTexture2D* FxaaTemp, FRenderQueue& RenderQueue)
 {
 	FLightingConstants Lighting;
 	FShadowStats ShadowStats{};
@@ -115,7 +161,23 @@ void FSceneRenderer::Render(UWorld& World, const FSceneView& SceneView, const FS
 	FStatOverlay::SetShadowStats(ShadowStats);
 
 	// 1. 불투명·반투명 Pass (Linear 씬 컬러)
-	RenderOpaquePass(SceneView, Settings, World, SceneInfo, RenderQueue, Lighting.Directional);
+	RenderOpaquePass(SceneView, Settings, World, SceneInfo, RenderQueue, Lighting.Directional, DecalBaseColorTarget, DecalNormalTarget, FrustumPlanes);
+
+	// 데이터 시각화 뷰는 씬 컬러 값 자체가 결과이므로 안개·인코딩·FXAA로 값을 바꾸지 않는다.
+	const EViewMode ViewMode = SceneView.RenderMode.ViewMode;
+	const bool bVisualizeData = IsDataVisualization(ViewMode);
+
+	const bool bCanRenderUnlitDecals = (ViewMode == EViewMode::Lit || ViewMode == EViewMode::Unlit) &&
+		Settings.bDrawDecals && !Settings.bDepthView && !bVisualizeData && !Settings.bVisualizeCascades && !Settings.bVisualizeTileLightCount &&
+		Settings.bDrawPrimitives && DecalBaseColorTarget != nullptr && SceneInfo.ColorRenderTargets.Num() > 0 && SceneInfo.ColorRenderTargets[0].Texture != nullptr;
+
+	if (bCanRenderUnlitDecals)
+	{
+		FTexture2D* SceneColorTarget = SceneInfo.ColorRenderTargets[0].Texture;
+		RenderScreenSpaceDecalPass(SceneView, Settings, World, SceneInfo, SceneColorTarget, nullptr, FrustumPlanes, true);
+	}
+
+	RenderTranslucentPass(SceneView, Settings, World, SceneInfo);
 
 	if (Settings.bDepthView)
 	{
@@ -124,10 +186,6 @@ void FSceneRenderer::Render(UWorld& World, const FSceneView& SceneView, const FS
 	}
 	else
 	{
-		// 데이터 시각화 뷰는 씬 컬러 값 자체가 결과이므로 안개·인코딩·FXAA로 값을 바꾸지 않는다.
-		const EViewMode ViewMode = SceneView.RenderMode.ViewMode;
-		const bool bVisualizeData = IsDataVisualization(ViewMode);
-
 		//직교인 경우 안개 Pass를 그리지 않는다.
 		if (!SceneView.bOrthographic && !bVisualizeData && Settings.bExponentialHeightFog)
 			// 2. 안개 Pass (Linear 씬 컬러)
@@ -144,33 +202,98 @@ void FSceneRenderer::Render(UWorld& World, const FSceneView& SceneView, const FS
 	}
 }
 
-void FSceneRenderer::RenderOpaquePass(const FSceneView& SceneView, const FSceneRenderSettings& Settings, const UWorld& ViewWorld, 
-									  const FRenderingInfo& SceneInfo, FRenderQueue& RenderQueue, const FDirectionalLightInfo& DirectionalLight)
+void FSceneRenderer::RenderOpaquePass(const FSceneView& SceneView, const FSceneRenderSettings& Settings, const UWorld& ViewWorld,
+									const FRenderingInfo& SceneInfo, FRenderQueue& RenderQueue, const FDirectionalLightInfo& DirectionalLight,
+									FTexture2D* DecalBaseColorTarget, FTexture2D* DecalNormalTarget, const FFrustumPlanes& FrustumPlanes)
 {
-	// 뷰 모드가 셰이더 permutation을, Wireframe 여부가 Fill Mode를 정한다. 삼각형 연결은 그대로다.
 	const FViewRenderMode ViewRenderMode = SceneView.RenderMode;
-	const bool bVisualizeLightCount = Settings.bVisualizeTileLightCount;
-	if (ViewRenderMode.ViewMode == EViewMode::Lit)
-	{
-		Renderer->EnsureTileLightCapacity(
-			SceneView.ViewProjection,
-			SceneInfo.ViewportSetting.Width,
-			SceneInfo.ViewportSetting.Height, bVisualizeLightCount);
-	}
-
-	// 배경은 화면에서 sRGB 0.3 회색으로 보여야 한다. Linear 작업 흐름에서는 인코딩될 것이므로 디코딩해 지운다.
-	FRenderingInfo PassInfo = SceneInfo;
-	const float ClearValue = ColorWorkflow::bLinear ? FLinearColor::SRGBToLinear(0.3f) : 0.3f;
-	PassInfo.ColorRenderTargets[0].ClearValue.ColorClearValue = FVector4(ClearValue, ClearValue, ClearValue, 1.0f);
-	RenderCommand::BeginRenderPass(PassInfo);
 
 	const bool bDrawPrimitives = Settings.bDrawPrimitives;
-	const ERasterizerState SceneRasterizerState = ViewRenderMode.ViewMode == EViewMode::Wireframe
-		? ERasterizerState::Wireframe : ERasterizerState::SolidBack;
+	const bool bVisualizeLightCount = Settings.bVisualizeTileLightCount;
 
-	// 렌더 루프 — 반드시 RenderAll보다 먼저
-	// 직교는 시선이 모두 평행해 파노라마의 한 점만 확대되므로 하늘을 그리지 않고 지우기 색을 배경으로 쓴다.
-	// 데이터 시각화 뷰도 하늘은 데이터가 없으므로 그리지 않는다.
+	const auto& Decals = ViewWorld.GetScene().GetDecalProxies();
+
+	const bool bUseDecals = (ViewRenderMode.ViewMode == EViewMode::Lit || ViewRenderMode.ViewMode == EViewMode::Unlit) &&
+		Settings.DecalRenderMode == EDecalRenderMode::ScreenSpace && Settings.bDrawDecals && !Settings.bDepthView && !IsDataVisualization(ViewRenderMode.ViewMode) &&
+		!Settings.bVisualizeCascades && !Settings.bVisualizeTileLightCount && bDrawPrimitives && !Decals.IsEmpty() && DecalBaseColorTarget != nullptr;
+
+	const ERasterizerState SceneRasterizerState = ViewRenderMode.ViewMode == EViewMode::Wireframe ? ERasterizerState::Wireframe : ERasterizerState::SolidBack;
+
+	Renderer->SetDecalTextures(nullptr, nullptr);
+
+	if (ViewRenderMode.ViewMode == EViewMode::Lit)
+	{
+		Renderer->EnsureTileLightCapacity(SceneView.ViewProjection, SceneInfo.ViewportSetting.Width, SceneInfo.ViewportSetting.Height, bVisualizeLightCount);
+	}
+
+	// ==========================================
+	// 공통 준비: RenderQueue 정렬
+	// ==========================================
+
+	if (bDrawPrimitives)
+	{
+		RenderCommand::SetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+		Renderer->RenderQueueSorting(RenderQueue, SceneView.ViewProjection, SceneView.Location);
+	}
+
+	if (bUseDecals)
+	{
+		FRenderingInfo DepthPassInfo = SceneInfo;
+
+		for (FRenderingDesc& Color : DepthPassInfo.ColorRenderTargets)
+		{
+			Color.LoadOp = ERenderTargetLoadOp::Load;
+		}
+
+		DepthPassInfo.DepthStencil.LoadOp = ERenderTargetLoadOp::Clear;
+
+		DepthPassInfo.DepthStencil.ClearValue.DepthClearValue = 1.0f;
+		DepthPassInfo.DepthStencil.ClearValue.StencilClearValue = 0;
+
+		RenderCommand::UnbindShaderResource(0, EShaderBindFlagBits::Pixel);
+
+		RenderCommand::BeginRenderPass(DepthPassInfo);
+
+		RenderCommand::SetRasterizerState(SceneRasterizerState);
+		RenderCommand::SetBlendState(EBlendState::NoColorWrite);
+		RenderCommand::SetDepthStencilState(EDepthStencilState::Default);
+
+		FViewRenderMode DepthMode = ViewRenderMode;
+		DepthMode.ViewMode = EViewMode::Unlit;
+
+		Renderer->SetViewMode(DepthMode);
+
+		Renderer->SetOpaquePassMode(EOpaquePassMode::DepthPrepass);
+
+		Renderer->RenderOpaque(SceneView.ViewProjection);
+
+		RenderCommand::EndRenderPass();
+
+		const bool bHasNormalDecals = ViewRenderMode.ViewMode == EViewMode::Lit &&
+			std::any_of(Decals.begin(), Decals.end(), [](const FDecalSceneProxy* Decal)
+				{ return !Decal->IsRenderAsUnlit() && Decal->GetNormalTexture() && Decal->GetOpacity() > 0.f; });
+		FTexture2D* NormalTarget = bHasNormalDecals ? DecalNormalTarget : nullptr;
+		RenderScreenSpaceDecalPass(SceneView, Settings, ViewWorld, SceneInfo, DecalBaseColorTarget, NormalTarget, FrustumPlanes, false);
+
+		Renderer->BindShadowForShading();
+
+		Renderer->SetDecalTextures(DecalBaseColorTarget, NormalTarget);
+	}
+
+	FRenderingInfo PassInfo = SceneInfo;
+
+	const float ClearValue = ColorWorkflow::bLinear ? FLinearColor::SRGBToLinear(0.3f) : 0.3f;
+
+	PassInfo.ColorRenderTargets[0].ClearValue.ColorClearValue = FVector4(ClearValue, ClearValue, ClearValue, 1.0f);
+
+	if (bUseDecals)
+	{
+		PassInfo.DepthStencil.LoadOp = ERenderTargetLoadOp::Load;
+	}
+
+	RenderCommand::BeginRenderPass(PassInfo);
+
 	if (!SceneView.bOrthographic && !IsDataVisualization(ViewRenderMode.ViewMode))
 	{
 		SkyboxRenderer->OnRender(SceneView.ViewProjection, SceneView.Location, DirectionalLight);
@@ -181,22 +304,17 @@ void FSceneRenderer::RenderOpaquePass(const FSceneView& SceneView, const FSceneR
 		RenderCommand::SetRasterizerState(SceneRasterizerState);
 		RenderCommand::SetBlendState(EBlendState::Opaque);
 		RenderCommand::SetDepthStencilState(EDepthStencilState::Default);
-
 		RenderCommand::SetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		Renderer->SetViewMode(ViewRenderMode);
-		// 불투명을 먼저 그리고 반투명을 먼 것부터 그린다.
-		// Grid는 깊이를 쓰지 않는 반투명 위에도 겹칠 수 있지만, 언리얼의 에디터 프리미티브처럼 Overlay Pass에서 마지막에 합성한다.
-		Renderer->RenderQueueSorting(RenderQueue, SceneView.ViewProjection, SceneView.Location);
+		Renderer->SetOpaquePassMode(bUseDecals ? EOpaquePassMode::DepthReadOnly : EOpaquePassMode::Normal);
 		Renderer->RenderOpaque(SceneView.ViewProjection);
+		RenderReceiverDecalPass(SceneView, Settings, ViewWorld);
 		DrawWorldText(SceneView, ViewWorld);
-		RenderCommand::SetRasterizerState(SceneRasterizerState); // TextRenderer가 상태를 바꾸므로 되돌림
-		Renderer->RenderTranslucent(SceneView.ViewProjection);
-		// 장면 Wireframe이 Grid·Gizmo·UI로 전파되지 않도록 복원한다.
 		RenderCommand::SetRasterizerState(ERasterizerState::SolidBack);
 	}
 
-
 	RenderCommand::EndRenderPass();
+	Renderer->SetDecalTextures(nullptr, nullptr);
 }
 
 void FSceneRenderer::DrawWorldText(const FSceneView& SceneView, const UWorld& ViewWorld)
@@ -246,7 +364,7 @@ void FSceneRenderer::RenderFogPass(const FSceneView& SceneView, const UWorld& Vi
 	RenderCommand::EndRenderPass();
 }
 
-void FSceneRenderer::RenderGammaEncodePass(const FRenderingInfo& SceneInfo, const FRenderingInfo& ViewInfo, bool bEncode, bool bToneMap, 
+void FSceneRenderer::RenderGammaEncodePass(const FRenderingInfo& SceneInfo, const FRenderingInfo& ViewInfo, bool bEncode, bool bToneMap,
 	float ExposureEV, bool bLetterbox, float TargetAspect, float InDamageIntensity, const FCameraScreenEffects& ScreenEffect)
 {
 	FTexture2D* SceneColor = SceneInfo.ColorRenderTargets[0].Texture;
@@ -311,5 +429,88 @@ void FSceneRenderer::RenderDepthPass(const FSceneView& SceneView, const FRenderi
 
 	RenderCommand::BeginRenderPass(PassInfo);
 	DepthViewRenderer->OnRender(ViewInfo.DepthStencil.Texture, SceneView.ViewProjection, SceneView.Location, SceneView.Forward);
+	RenderCommand::EndRenderPass();
+}
+
+void FSceneRenderer::RenderReceiverDecalPass(const FSceneView& SceneView, const FSceneRenderSettings& Settings, const UWorld& ViewWorld)
+{
+    if (Settings.DecalRenderMode != EDecalRenderMode::ReceiverMesh || !Settings.bDrawDecals || !DecalRenderer ||
+        Settings.bDepthView || Settings.bVisualizeTileLightCount || Settings.bVisualizeCascades)
+        return;
+    if (SceneView.RenderMode.ViewMode != EViewMode::Lit && SceneView.RenderMode.ViewMode != EViewMode::Unlit)
+        return;
+
+    const uint64 Start = FPlatformTime::GetCycles64();
+    const auto Decals = GatherVisibleDecals(ViewWorld.GetScene(), ExtractFrustumPlanes(SceneView.ViewProjection),
+        ViewWorld.GetWorldType() != EWorldType::Editor, false);
+    bool bPrepared = false;
+    for (const FDecalSceneProxy* Decal : Decals)
+    {
+        const float Fade = FDecalRenderer::CalculateScreenFade(*Decal, SceneView.ViewProjection, SceneView.bOrthographic);
+        if (Fade <= 0.f) continue;
+        if (!bPrepared) { Renderer->PrepareDecalReceivers(); bPrepared = true; }
+        FStatOverlay::AddDecalSubmission();
+        Renderer->RenderDecal(*DecalRenderer, ViewWorld.GetScene(), *Decal, SceneView, Fade);
+    }
+    FStatOverlay::AddDecalCPUTime(FPlatformTime::ToMilliseconds64(FPlatformTime::GetCycles64() - Start));
+}
+
+void FSceneRenderer::RenderScreenSpaceDecalPass(const FSceneView& SceneView, const FSceneRenderSettings& Settings, const UWorld& ViewWorld,
+    const FRenderingInfo& SceneInfo, FTexture2D* OutputTarget, FTexture2D* NormalTarget, const FFrustumPlanes& FrustumPlanes, bool bRenderAsUnlit)
+{
+    if (!Settings.bDrawDecals || !Settings.bDrawPrimitives || !OutputTarget || !ScreenSpaceDecalRenderer)
+        return;
+    const uint64 Start = FPlatformTime::GetCycles64();
+    const auto Decals = GatherVisibleDecals(ViewWorld.GetScene(), FrustumPlanes,
+        ViewWorld.GetWorldType() != EWorldType::Editor, bRenderAsUnlit);
+
+    FRenderingInfo PassInfo{};
+    PassInfo.ViewportSetting = SceneInfo.ViewportSetting;
+    FRenderingDesc Color{};
+    Color.Texture = OutputTarget;
+    Color.LoadOp = bRenderAsUnlit ? ERenderTargetLoadOp::Load : ERenderTargetLoadOp::Clear;
+    Color.ClearValue.ColorClearValue = FVector4(0.f, 0.f, 0.f, 0.f);
+    PassInfo.ColorRenderTargets.Add(Color);
+    if (NormalTarget)
+    {
+        FRenderingDesc Normal = Color;
+        Normal.Texture = NormalTarget;
+        Normal.LoadOp = ERenderTargetLoadOp::Clear;
+        PassInfo.ColorRenderTargets.Add(Normal);
+    }
+    PassInfo.DepthStencil.Texture = nullptr;
+    RenderCommand::BeginRenderPass(PassInfo);
+    ScreenSpaceDecalRenderer->OnRender(SceneInfo.DepthStencil.Texture, SceneView.ViewProjection, Decals,
+        SceneInfo.ViewportSetting, SceneView.bOrthographic, NormalTarget != nullptr);
+    RenderCommand::EndRenderPass();
+    RenderCommand::SetRasterizerState(ERasterizerState::SolidBack);
+    RenderCommand::UnbindShaderResource(0, EShaderBindFlagBits::Pixel);
+    RenderCommand::UnbindShaderResource(1, EShaderBindFlagBits::Pixel);
+    RenderCommand::UnbindShaderResource(2, EShaderBindFlagBits::Pixel);
+    // The SSD stencil SRV uses the shadow array's t2 slot.
+    Renderer->BindShadowForShading();
+    FStatOverlay::AddDecalCPUTime(FPlatformTime::ToMilliseconds64(FPlatformTime::GetCycles64() - Start));
+}
+
+void FSceneRenderer::RenderTranslucentPass(const FSceneView& SceneView, const FSceneRenderSettings& Settings, const UWorld& ViewWorld, const FRenderingInfo& SceneInfo)
+{
+	if (!Settings.bDrawPrimitives)
+	{
+		return;
+	}
+
+	FRenderingInfo PassInfo = SceneInfo;
+
+	for (FRenderingDesc& Color : PassInfo.ColorRenderTargets)
+	{
+		Color.LoadOp = ERenderTargetLoadOp::Load;
+	}
+
+	PassInfo.DepthStencil.LoadOp = ERenderTargetLoadOp::Load;
+
+	RenderCommand::BeginRenderPass(PassInfo);
+
+	RenderCommand::SetRasterizerState(ERasterizerState::SolidBack);
+	Renderer->RenderTranslucent(SceneView.ViewProjection);
 	RenderCommand::EndRenderPass();
 }

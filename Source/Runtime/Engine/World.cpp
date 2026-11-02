@@ -33,6 +33,8 @@
 #include "Component/SphereComponent.h"
 #include "Collision/PhysicsScene.h"
 
+#include "Component/DecalComponent.h"
+
 DECLARE_CYCLE_STAT("Actor Tick", STAT_ActorTick); // Actor 틱 측정
 DECLARE_CYCLE_STAT("Update All Transforms", STAT_UpdateAllTransforms); // 각 Transform의 Update 시간 측정
 DECLARE_CYCLE_STAT("Gather Render Packets", STAT_GatherRenderPackets);
@@ -134,6 +136,8 @@ AActor* UWorld::SpawnActor(UClass* Class, FName InName, const FTransform* Transf
 			Scene.AddFogInfo(Fog->GetUUID(), Fog->GetFogInfo());
 		else if (ULightComponentBase* Light = Cast<ULightComponentBase>(Component))
 			Scene.AddLight(Light);
+		else if (UDecalComponent* Decal = Cast<UDecalComponent>(Component))
+			Scene.AddDecal(Decal);
 	}
 
 	// 4. Level->Actors에 등록
@@ -221,6 +225,7 @@ void UWorld::ClearWorld()
 	PhysicsScene.RemoveAllPrimitives();
 	Scene.RemoveAllFogInfo();
 	Scene.RemoveAllLights();
+	Scene.RemoveAllDecals();
 	for (ULevel* Level : Levels)
 	{
 		for (AActor* Actor : Level->Actors)
@@ -612,6 +617,10 @@ bool UWorld::DestroyActor(AActor* Actor)
 		{
 			Scene.RemoveLight(Light);
 		}
+		else if (UDecalComponent* Decal = Cast<UDecalComponent>(Component))
+		{
+			Scene.RemoveDecal(Decal);
+		}
 	}
 
 	Actor->RegisterAllActorTickFunctions(false);
@@ -831,6 +840,8 @@ void UWorld::PostDuplicate(bool bDuplicateForPIE)
 				Scene.AddFogInfo(Fog->GetUUID(), Fog->GetFogInfo());
 			else if (ULightComponentBase* Light = Cast<ULightComponentBase>(Component))
 				Scene.AddLight(Light);
+			else if (UDecalComponent* Decal = Cast<UDecalComponent>(Component))
+				Scene.AddDecal(Decal);
 		}
 
 		NewActorList.Add(Actor);   // Tick 등록은 BeginPlay에서 함

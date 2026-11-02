@@ -37,6 +37,8 @@ public:
     const FCachedMeshLOD& GetLOD(uint32 Index) const { return RenderState->LODs[Index]; }
     const FCachedMeshSection& GetSection(uint32 Index) const { return RenderState->Sections[Index]; }
     FScene* GetScene() const { return Scene; }
+
+	bool IsReceiveDecal() const { return bReceiveDecal; }
 private:
     friend class FScene;
     FScene* Scene = nullptr;
@@ -54,5 +56,6 @@ private:
     bool bVisible = true;
     bool bCastShadow = true;
     bool bReceiveShadow = true;
+	bool bReceiveDecal = true;
     bool bHiddenInGame = false;
 };
