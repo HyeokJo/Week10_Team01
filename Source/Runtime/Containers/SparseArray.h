@@ -156,7 +156,7 @@ public:
 			: Owner(owner)
 			, Index(index)
 		{
-			while (Index < Owner->mDatas.size() && !Owner->IsValidIndex(Index)) 
+			while (Index < Owner->mDatas.size() && !Owner->IsValidIndex(static_cast<uint32>(Index))) 
 			{
 				Index++;
 			}
@@ -164,19 +164,19 @@ public:
 
 		T& operator*() const
 		{
-			assert(Owner->IsValidIndex(Index));
-			return (*Owner)[Index];
+			assert(Owner->IsValidIndex(static_cast<uint32>(Index)));
+			return (*Owner)[static_cast<uint32>(Index)];
 		}
 
 		T* operator->() const
 		{
-			assert(Owner->IsValidIndex(Index));
-			return &(*Owner)[Index];
+			assert(Owner->IsValidIndex(static_cast<uint32>(Index)));
+			return &(*Owner)[static_cast<uint32>(Index)];
 		}
 
 		Iterator& operator++()
 		{
-			while (Index < Owner->mDatas.size() && !Owner->IsValidIndex(++Index)) {}
+			while (Index < Owner->mDatas.size() && !Owner->IsValidIndex(static_cast<uint32>(++Index))) {}
 			return *this;
 		}
 
@@ -203,7 +203,7 @@ public:
 			: Owner(owner)
 			, Index(index)
 		{
-			while (Index < Owner->mDatas.size() && !Owner->IsValidIndex(Index))
+			while (Index < Owner->mDatas.size() && !Owner->IsValidIndex(static_cast<uint32>(Index)))
 			{
 				Index++;
 			}
@@ -211,19 +211,19 @@ public:
 
 		const T& operator*() const
 		{
-			assert(Owner->IsValidIndex(Index));
-			return (*Owner)[Index];
+			assert(Owner->IsValidIndex(static_cast<uint32>(Index)));
+			return (*Owner)[static_cast<uint32>(Index)];
 		}
 
 		const T* operator->() const
 		{
-			assert(Owner->IsValidIndex(Index));
-			return &(*Owner)[Index];
+			assert(Owner->IsValidIndex(static_cast<uint32>(Index)));
+			return &(*Owner)[static_cast<uint32>(Index)];
 		}
 
 		ConstIterator& operator++()
 		{
-			while (Index < Owner->mDatas.size() && !Owner->IsValidIndex(++Index)) {}
+			while (Index < Owner->mDatas.size() && !Owner->IsValidIndex(static_cast<uint32>(++Index))) {}
 			return *this;
 		}
 
@@ -318,7 +318,7 @@ private:
 
 	void AddUninitilize()
 	{
-		int32 NewIndex = mDatas.size();
+		int32 NewIndex = static_cast<int32>(mDatas.size());
 		FSlot& NewSlot = mDatas.emplace_back();
 
 		if (mFreeIndex != -1)

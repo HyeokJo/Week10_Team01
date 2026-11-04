@@ -143,7 +143,7 @@ bool FShadowMapManager::EnsureShadowMapAtlas(uint32 InNewAtlasResolution, uint32
     AtlasResolution = InNewAtlasResolution;
 
     ShadowMapAtlasBuffer.Reset();
-    for (uint32 i = 0; i < ShadowAtlasDepthView.Num(); i++)
+    for (uint32 i = 0; i < static_cast<uint32>(ShadowAtlasDepthView.Num()); i++)
     {
         ShadowAtlasDepthView[i].Reset();
     }
@@ -671,7 +671,7 @@ void FShadowMapManager::UpdatePreview(FLightSceneProxy* PreviewShadowMapProxy, c
     // 3번 4번 아틀라스에 저장되면 ShadowInfo 가 갖고있는 인덱스는 3혹은 4인데 
     // PrevicewShadowTextures 배열에 접근할 때는 추가적인 인덱스 계산이 필요함.
     // 그래서 번호 유지를 위해서 실제로 사용하는 인덱스에만 저장.
-    if (PreviewShadowTextures.Num() < NumAtlas)
+    if (static_cast<uint32>(PreviewShadowTextures.Num()) < NumAtlas)
     {
         PreviewShadowTextures.SetNum(NumAtlas);
         PreviewShadowSRVs.SetNum(NumAtlas);

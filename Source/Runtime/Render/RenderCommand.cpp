@@ -91,7 +91,7 @@ void RenderCommand::BindShaderProgram(FShaderProgram* Shader)
 	RenderDevice->GetContext()->IASetInputLayout(Shader->VertexShader->GetLayout());
 }
 
-void RenderCommand::BindMesh(UStaticMesh* Mesh, uint32 LODIndex)
+void RenderCommand::BindMesh(const FMeshRenderResource* Mesh, uint32 LODIndex)
 {
 	BindVertexBuffer(Mesh->GetVertexBuffer(LODIndex));
 	BindIndexBuffer(Mesh->GetIndexBuffer(LODIndex));

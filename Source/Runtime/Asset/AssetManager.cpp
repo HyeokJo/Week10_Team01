@@ -10,6 +10,8 @@
 #include "Render/RenderResourceManager.h"
 
 #include "Asset/ObjImporter/ObjImporter.h"
+#include "Asset/FbxImporter/FbxImporter.h"
+#include "Render/SkeletalMesh.h"
 
 #include "Render/GeometryGenerator.h"
 #include "UObject/UObjectGlobals.h"
@@ -34,6 +36,46 @@ namespace
 			UTexture2D* Texture = UAssetManager::Get().LoadTexture(TexturePath, bGenerateMipmaps, bSRGB);
 			Material->Textures[SlotIndex] = Texture;
 		}
+	}
+
+	// MaterialSlots(쿡 결과)를 실제 UMaterial로 바꾼다. 스태틱,스켈레탈 공통
+	bool CreateSlotMaterials(const TArray<FStaticMaterialSlot>& Slots, TArray<UMaterial*>& OutMaterials)
+	{
+		UMaterial* DefaultMaterial = UAssetManager::GetAssetByPath<UMaterial>("DefaultMaterial");
+		if (!DefaultMaterial)
+		{
+			return false;
+		}
+
+		for (const FStaticMaterialSlot& Slot : Slots)
+		{
+			UMaterial* Material = UMaterial::CreateInstance(DefaultMaterial);
+			if (!Material)
+			{
+				return false;
+			}
+			Material->BaseColor = Slot.BaseColor;
+			Material->Shininess = Slot.Shininess;
+			Material->SpecularColor = Slot.SpecularColor;
+			if (Material->BaseColor.A < 1.0f)
+			{
+				Material->BlendState = EBlendState::AlphaBlend;
+				Material->DepthStencilState = EDepthStencilState::ReadOnly;
+			}
+
+			if (!Slot.DiffuseTexturePath.empty())
+			{
+				UTexture2D* Texture = UAssetManager::Get().LoadTexture(Slot.DiffuseTexturePath);
+
+				if (Texture)
+				{
+					Material->Textures[0] = Texture;
+				}
+			}
+			SetMaterialTexture(1, Material, Slot.NormalTexturePath, true, false);
+			OutMaterials.Add(Material);
+		}
+		return true;
 	}
 
 	UStaticMesh* CreateStaticMesh(const FStaticMeshData* MeshData)
@@ -74,45 +116,35 @@ namespace
 		Mesh->VertexBuffer = std::move(VB);
 		Mesh->IndexBuffer = std::move(IB);
 
-		UMaterial* DefaultMaterial = UAssetManager::GetAssetByPath<UMaterial>("DefaultMaterial");
-		if (!DefaultMaterial)
+		if (!CreateSlotMaterials(Mesh->MeshData.MaterialSlots, Mesh->Materials))
 		{
 			return nullptr;
-		}
-
-		// MaterialSlots를 실제 UMaterial로 변환
-		for (const FStaticMaterialSlot& Slot : Mesh->MeshData.MaterialSlots)
-		{
-			UMaterial* Material = UMaterial::CreateInstance(DefaultMaterial);
-			if (!Material)
-			{
-				return nullptr;
-			}
-			Material->BaseColor = Slot.BaseColor;
-			Material->Shininess = Slot.Shininess;
-			Material->SpecularColor = Slot.SpecularColor;
-			if (Material->BaseColor.A < 1.0f)
-			{
-				Material->BlendState = EBlendState::AlphaBlend;
-				Material->DepthStencilState = EDepthStencilState::ReadOnly;
-			}
-
-			if (!Slot.DiffuseTexturePath.empty())
-			{
-				UTexture2D* Texture = UAssetManager::Get().LoadTexture(Slot.DiffuseTexturePath);
-
-				if (Texture)
-				{
-					Material->Textures[0] = Texture;
-				}
-			}
-			SetMaterialTexture(1, Material, Slot.NormalTexturePath, true, false);
-			Mesh->Materials.Add(Material);
 		}
 
 		Mesh->MeshData.BuildTriangleBVH();
 		Mesh->RebuildRenderData();
 
+		return Mesh;
+	}
+
+	// 스켈레탈 에셋은 정점 버퍼를 만들지 않는다 (포즈마다 달라서 컴포넌트의 FSkeletalMeshObject가 만든다).
+	// 인덱스 버퍼와 머티리얼만 만든다
+	USkeletalMesh* CreateSkeletalMesh(TUniquePtr<FSkeletalMeshData> MeshData)
+	{
+		if (!MeshData || MeshData->Vertices.IsEmpty() || MeshData->Indices.IsEmpty() || MeshData->Skeleton.Bones.IsEmpty())
+			return nullptr;
+
+		TUniquePtr<FIndexBuffer> IB = RenderCommand::CreateStaticIndexBuffer(MeshData->Indices.GetData(), static_cast<uint32>(MeshData->Indices.Num()));
+		if (IB == nullptr) return nullptr;
+
+		USkeletalMesh* Mesh = NewObject<USkeletalMesh>();
+		Mesh->MeshData = std::move(*MeshData);
+		Mesh->IndexBuffer = std::move(IB);
+
+		if (!CreateSlotMaterials(Mesh->MeshData.MaterialSlots, Mesh->Materials))
+		{
+			return nullptr;
+		}
 		return Mesh;
 	}
 
@@ -199,6 +231,16 @@ void UAssetManager::LoadAsset(const FString& Key, const FString& Path)
 	if (Extension == ".sequence")
 	{
 		LoadLevelSequence(Path);
+	}
+	if (Extension == ".fbx")
+	{
+		//테스트 로그
+		//FFbxImporter::DebugPrintScene(Path);
+		FFbxImportOptions FbxOption;
+		FbxOption.bImportStaticMesh = true;
+		FbxOption.bImportSkeletalMesh = true;   // 스킨이 있으면 스켈레탈 우선
+
+		LoadFbx(Path, FbxOption);
 	}
 }
 
@@ -474,6 +516,56 @@ ULevelSequence* UAssetManager::LoadLevelSequence(const FString& Path)
 	Get().RegisterAsset(Key, LevelSequence);
 
 	return LevelSequence;
+}
+
+void UAssetManager::LoadFbx(const FString& Path, const FFbxImportOptions& Option)
+{
+	// 같은 키에 에셋은 하나뿐이다. 스킨이 있으면 스켈레탈로, 아니면(또는 실패하면) 스태틱으로 읽는다
+	if (Option.bImportSkeletalMesh && LoadFbxSkeletalMesh(Path, Option))
+	{
+		return;
+	}
+	if (Option.bImportStaticMesh)
+	{
+		LoadFbxStaticMesh(Path, Option);
+	}
+}
+
+USkeletalMesh* UAssetManager::LoadFbxSkeletalMesh(const FString& Path, const FFbxImportOptions& Option)
+{
+	const FString Key = MakeAssetKey(Path);
+	if (USkeletalMesh* Cached = GetAssetByPath<USkeletalMesh>(Key))
+	{
+		return Cached;
+	}
+
+	USkeletalMesh* Mesh = CreateSkeletalMesh(FFbxImporter::LoadSkeletalMeshData(Path, Option));   // 스킨이 없으면 nullptr
+	if (!Mesh)
+	{
+		return nullptr;
+	}
+
+	Get().RegisterAsset(Key, Mesh);
+	return Mesh;
+}
+
+UStaticMesh* UAssetManager::LoadFbxStaticMesh(const FString& Path, const FFbxImportOptions& Option)
+{
+	const FString Key = MakeAssetKey(Path);
+	if (UStaticMesh* Cached = GetAssetByPath<UStaticMesh>(Key))
+	{
+		return Cached;
+	}
+
+	TUniquePtr<FStaticMeshData> Data = FFbxImporter::LoadStaticMeshData(Path, Option);
+	UStaticMesh* Mesh = CreateStaticMesh(Data.get());   // Data가 nullptr이면 nullptr 반환
+	if (!Mesh)
+	{
+		return nullptr;
+	}
+
+	Get().RegisterAsset(Key, Mesh);
+	return Mesh;
 }
 
 bool UAssetManager::ReorientStaticMesh(UStaticMesh& Mesh, const std::function<FVector(const FVector&)>& Rotate)

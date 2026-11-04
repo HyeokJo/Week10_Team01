@@ -491,6 +491,8 @@ void FLuaBindings::RegisterLuaBindings(sol::state& Lua, FLuaCoroutineScheduler* 
 		{
 			return Rain->GetInterval();
 		}
+		// CoinRain.lua가 이 값을 WaitForSeconds에 넘기므로, 0 이하를 주면 매 프레임 도는 루프가 된다
+		return 1.0f;
 	});
 	CoinRain.set_function("Spawn", [](AActor* Actor)
 	{
@@ -541,7 +543,7 @@ static sol::object ConvertComponentToActual(UActorComponent* Component)
 
 sol::object FLuaBindings::FindComponentByName(const AActor& Actor, sol::string_view NameStr)
 {
-	return ConvertComponentToActual(Actor.FindComponentByName(FName(NameStr.data(), NameStr.size())));
+	return ConvertComponentToActual(Actor.FindComponentByName(FName(NameStr.data(), static_cast<int32>(NameStr.size()))));
 }
 
 sol::object FLuaBindings::FindComponentByClass(const AActor& Actor, const UClass* Clss)
@@ -556,7 +558,7 @@ sol::object FLuaBindings::SpawnActor(UWorld& World, UClass* Class, const FTransf
 
 sol::object FLuaBindings::SpawnActor(UWorld& World, UClass* Class, sol::string_view NameStr, const FTransform* Transform)
 {
-	return ConvertActorToActual(World.SpawnActor(Class, FName(NameStr.data(), NameStr.size()), Transform));
+	return ConvertActorToActual(World.SpawnActor(Class, FName(NameStr.data(), static_cast<int32>(NameStr.size())), Transform));
 }
 
 void FLuaBindings::OpenLevel(AActor* WorldContextObject, sol::string_view NextURL)

@@ -48,9 +48,9 @@ void FOutlineRenderer::OnRender(const FOutline& InOutline, const FMatrix& InView
 	TArray<const UPrimitiveComponent*> Targets;
 	for (const UPrimitiveComponent* Target : InOutline.GetTargets())
 	{
-		const UStaticMesh* TargetMesh = Target ? Target->GetRenderMesh() : nullptr;
+		const FMeshRenderResource* TargetMesh = Target ? Target->GetRenderResource() : nullptr;
 		const bool bInViewWorld = !ViewWorld || (Target->GetOwner() && Target->GetOwner()->GetWorld() == ViewWorld);
-		if (TargetMesh && TargetMesh->IndexBuffer && bInViewWorld)
+		if (TargetMesh && TargetMesh->GetIndexBuffer(0) && bInViewWorld)
 			Targets.Add(Target);
 	}
 	if (Targets.IsEmpty())
@@ -79,7 +79,7 @@ void FOutlineRenderer::OnRender(const FOutline& InOutline, const FMatrix& InView
 
 void FOutlineRenderer::DrawTarget(const UPrimitiveComponent* Target, const FPipelineState& PipelineState, const FMatrix& ViewProj, const FVector4& ViewportAndThickness)
 {
-	UStaticMesh* TargetMesh = Target->GetRenderMesh();
+	const FMeshRenderResource* TargetMesh = Target->GetRenderResource();
 	const FMatrix World = Target->GetWorldMatrix();
 	const FOutlineData Constants = { World, World.Inverse().GetTransposed(), ViewProj, ViewportAndThickness };
 
@@ -90,5 +90,5 @@ void FOutlineRenderer::DrawTarget(const UPrimitiveComponent* Target, const FPipe
 		RenderCommand::SetDepthStencilState(EDepthStencilState::StencilMask, 0x01);
 	}
 	RenderCommand::UpdateBufferData(ConstantBuffer.get(), &Constants, sizeof(Constants));
-	RenderCommand::DrawIndexed(TargetMesh->IndexBuffer->GetIndexCount());
+	RenderCommand::DrawIndexed(TargetMesh->GetIndexBuffer(0)->GetIndexCount());
 }

@@ -1,4 +1,4 @@
-#pragma once
+ï»¿#pragma once
 
 #include "GameFramework/Actor.h"
 #include "UObject/Class.h"
@@ -38,13 +38,13 @@ public:
 
 	void BeginPlay() override;
 
-	//¾÷µ¥ÀÌÆ® Ä«¸Ş¶ó
+	//ì—…ë°ì´íŠ¸ ì¹´ë©”ë¼
 	void UpdateCamera(float DeltaTime);
 
 	void UpdateViewTarget(FViewTarget& InViewTarget, float DeltaTime);
 
-	// ModifierClass·Î Modifier¸¦ ¸¸µé¾î Priority ¼ø¼­¿¡ ¸Â°Ô ³Ö´Â´Ù. PCMÀÌ ¼ÒÀ¯ÇÑ´Ù.
-	// ½ÇÆĞ(Àß¸øµÈ Å¬·¡½º, Exclusive Ãæµ¹)ÇÏ¸é nullptr.
+	// ModifierClassë¡œ Modifierë¥¼ ë§Œë“¤ì–´ Priority ìˆœì„œì— ë§ê²Œ ë„£ëŠ”ë‹¤. PCMì´ ì†Œìœ í•œë‹¤.
+	// ì‹¤íŒ¨(ì˜ëª»ëœ í´ë˜ìŠ¤, Exclusive ì¶©ëŒ)í•˜ë©´ nullptr.
 	UCameraModifier* AddNewCameraModifier(UClass* ModifierClass);
 
 	template<typename T>
@@ -61,15 +61,15 @@ public:
 		return static_cast<T*>(FindCameraModifierByClass(T::StaticClass()));
 	}
 
-	// ¹Ù·Î Áö¿ìÁö ¾Ê°í ÀÌ¹ø ÇÁ·¹ÀÓ Modifier Àû¿ëÀÌ ³¡³­ µÚ Áö¿î´Ù.
+	// ë°”ë¡œ ì§€ìš°ì§€ ì•Šê³  ì´ë²ˆ í”„ë ˆì„ Modifier ì ìš©ì´ ëë‚œ ë’¤ ì§€ìš´ë‹¤.
 	void RemoveCameraModifier(UCameraModifier* Modifier);
 
-	// Modifier ¼Ò¸êÀÚ°¡ ºÎ¸¥´Ù. deleteÇÏÁö ¾Ê°í ¸ñ·Ï¿¡¼­¸¸ »«´Ù
+	// Modifier ì†Œë©¸ìê°€ ë¶€ë¥¸ë‹¤. deleteí•˜ì§€ ì•Šê³  ëª©ë¡ì—ì„œë§Œ ëº€ë‹¤
 	void RemoveModifierFromList(UCameraModifier* Modifier);
 
 	void ApplyCameraModifiers(float DeltaTime, FMinimalViewInfo& POV);
 
-	// Shake Modifier¿¡ Shake¸¦ ÇÏ³ª Ãß°¡ÇØ¼­ ½ÃÀÛÇÑ´Ù. ½ÇÆĞÇÏ¸é nullptr
+	// Shake Modifierì— Shakeë¥¼ í•˜ë‚˜ ì¶”ê°€í•´ì„œ ì‹œì‘í•œë‹¤. ì‹¤íŒ¨í•˜ë©´ nullptr
 	UCameraShakeBase* StartCameraShake(UClass* ShakeClass, float Scale = 1.f);
 
 	template<typename T>
@@ -82,7 +82,7 @@ public:
 
 
 
-	//Fade È¿°ú Àû¿ë
+	//Fade íš¨ê³¼ ì ìš©
 	void UpdateFade(float DeltaTime);
 
 	void UpdateLetterBox(float DeltaTime);
@@ -95,29 +95,29 @@ public:
 
 	void InitializeFor(APlayerController* PC);
 
-	//bEnableFading¸¦ true·Î ¹Ù²Ù°í Fade°ªµéÀ» ¼³Á¤ÇÕ´Ï´Ù.
+	//bEnableFadingë¥¼ trueë¡œ ë°”ê¾¸ê³  Fadeê°’ë“¤ì„ ì„¤ì •í•©ë‹ˆë‹¤.
 	//[Fade In] From : 1.0, To : 0.0
 	//[Fade Out] From : 0.0, To : 1.0
-	//bInHoldWhenFinished : Fade°¡ ³¡³ª°í À¯ÁöÇÒÁö ÀÔ´Ï´Ù. Fade OutÀÇ °æ¿ì true·Î ÇØ¾ß À¯ÁöµË´Ï´Ù.
+	//bInHoldWhenFinished : Fadeê°€ ëë‚˜ê³  ìœ ì§€í• ì§€ ì…ë‹ˆë‹¤. Fade Outì˜ ê²½ìš° trueë¡œ í•´ì•¼ ìœ ì§€ë©ë‹ˆë‹¤.
 	void StartCameraFade(float From, float To, float Duration, FLinearColor Color, bool bInHoldWhenFinished = false);
 
 	void StopCameraFade();
 
 	void SetManualCameraFade(float Amount, FLinearColor Color);
 
-	//°è»êµÈ Ä«¸Ş¶ó È¿°ú °ª
+	//ê³„ì‚°ëœ ì¹´ë©”ë¼ íš¨ê³¼ ê°’
 	FCameraScreenEffects GetScreenEffects()const;
 
-	// ºñ³×Æ®. °ÔÀÓ°ú PIE¿¡¼­ ÀÌ °ªÀÌ È­¸é¿¡ Àû¿ëµÈ´Ù (¿¡µğÅÍ View´Â ¿¡µğÅÍ ¼³Á¤ °ª)
+	// ë¹„ë„¤íŠ¸. ê²Œì„ê³¼ PIEì—ì„œ ì´ ê°’ì´ í™”ë©´ì— ì ìš©ëœë‹¤ (ì—ë””í„° ViewëŠ” ì—ë””í„° ì„¤ì • ê°’)
 	void SetVignette(const FVignetteSettings& InVignette) { Vignette = InVignette; }
 	const FVignetteSettings& GetVignette() const { return Vignette; }
 
 private:
-	// Á¤·Ä À§Ä¡¿¡ ³Ö´Â´Ù. Exclusive Ãæµ¹ÀÌ¸é false.
+	// ì •ë ¬ ìœ„ì¹˜ì— ë„£ëŠ”ë‹¤. Exclusive ì¶©ëŒì´ë©´ false.
 	bool AddCameraModifierToList(UCameraModifier* NewModifier);
-	// Á¦°Å ¿¹¾àµÈ Modifier¸¦ ½ÇÁ¦·Î delete
+	// ì œê±° ì˜ˆì•½ëœ Modifierë¥¼ ì‹¤ì œë¡œ delete
 	void FlushRemovedModifiers();
-	// ¸ğµç Modifier delete (PCM ¼Ò¸ê ½Ã)
+	// ëª¨ë“  Modifier delete (PCM ì†Œë©¸ ì‹œ)
 	void ClearCameraModifiers();
 
 private:
@@ -126,27 +126,27 @@ private:
 	FViewTarget PendingViewTarget;
 	FMinimalViewInfo CameraCachePOV;
 
-	//Priority¼øÀ¸·Î Á¤·ÄÇÏ¿© º¸°ü
+	//Priorityìˆœìœ¼ë¡œ ì •ë ¬í•˜ì—¬ ë³´ê´€
 	TArray<UCameraModifier*> ModifierList;
 
-	//PCMÀÌ »ı¼ºµÉ ¶§ ÀÚµ¿À¸·Î »ı¼ºÇÒ Modifierµé
+	//PCMì´ ìƒì„±ë  ë•Œ ìë™ìœ¼ë¡œ ìƒì„±í•  Modifierë“¤
 	TArray<UClass*> DefaultModifiers;
 
-	//Áö¿ï °Å ÀúÀå
+	//ì§€ìš¸ ê±° ì €ì¥
 	TArray<UCameraModifier*> ModifiersToRemove;
 
-	//ÀüÈ¯ ½Ã°£
+	//ì „í™˜ ì‹œê°„
 	float BlendTimeToGo = 0.f;
 
 	//Fade In and out
 	FLinearColor FadeColor = FLinearColor::Black;
 
-	//X´Â ½ÃÀÛ ¾ËÆÄ, Y´Â Á¾·á ¾ËÆÄ.
-	// SceneColor¿Í FadeColor¸¦ Alpha·Î ¼¯´Â´Ù.
-	//Fade OutÀÌ¸é(0, 1) Fade InÀÌ¸é(1, 0)ÀÌ´Ù
+	//XëŠ” ì‹œì‘ ì•ŒíŒŒ, YëŠ” ì¢…ë£Œ ì•ŒíŒŒ.
+	// SceneColorì™€ FadeColorë¥¼ Alphaë¡œ ì„ëŠ”ë‹¤.
+	//Fade Outì´ë©´(0, 1) Fade Inì´ë©´(1, 0)ì´ë‹¤
 	FVector2 FadeAlpha = FVector2();
 
-	//½ÇÁ¦ Fade °è»ê·®
+	//ì‹¤ì œ Fade ê³„ì‚°ëŸ‰
 	float FadeAmount = 0.f;
 
 	float FadeTime = 0.f;
@@ -155,6 +155,6 @@ private:
 	bool bUpdateFading = true;
 	bool bHoldWhenFinished = false;
 
-	//ºñ³×Æ®
+	//ë¹„ë„¤íŠ¸
 	FVignetteSettings Vignette;
 };

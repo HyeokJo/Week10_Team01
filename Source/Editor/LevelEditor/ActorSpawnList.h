@@ -2,6 +2,7 @@
 
 #include "GameFramework/Actor/ParticleActor.h"
 #include "GameFramework/Actor/StaticMeshActor.h"
+#include "GameFramework/Actor/SkeletalMeshActor.h"
 #include "GameFramework/Actor/TextRenderActor.h"
 #include "GameFramework/Actor/ExponentialHeightFogActor.h"
 #include "GameFramework/Actor/AmbientLightActor.h"
@@ -33,6 +34,7 @@ inline constexpr FSpawnableActorType SpawnableActorTypes[] =
 {
 	{ "Actor",                &AActor::StaticClass },
 	{ "StaticMesh",           &AStaticMeshActor::StaticClass },
+	{ "SkeletalMesh",         &ASkeletalMeshActor::StaticClass },
 	{ "LevelSequence",        &ALevelSequenceActor::StaticClass },
 	{ "Particle",             &AParticleActor::StaticClass },
 	{ "Text",                 &ATextRenderActor::StaticClass },

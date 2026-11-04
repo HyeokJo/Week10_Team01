@@ -176,6 +176,10 @@ void FContentDrawerPanel::OnRender()
 					{
 						OpenLevelSequence(PathString);
 					}
+					else if (Path.extension() == ".fbx" && OpenFbx)
+					{
+						OpenFbx(PathString);
+					}
 				}
 				// 파일 이름 표시
 				ImGui::TextWrapped("%s", FilenameString.c_str());

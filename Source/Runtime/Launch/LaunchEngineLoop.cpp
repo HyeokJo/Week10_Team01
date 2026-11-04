@@ -33,9 +33,11 @@ namespace
 }
 
 // 엔진 생성자에서도 사이클 카운터를 쓸 수 있게 가장 먼저 초기화한다.
+// 로그 파일도 여기서 열어야 엔진·에셋 초기화 중의 로그까지 파일에 남는다.
 FEngineLoop::FEngineLoop()
 {
 	FPlatformTime::InitTiming();
+	FLog::Init();
 }
 
 // TUniquePtr 멤버의 완전한 타입이 필요하므로 cpp에서 정의한다.
@@ -200,6 +202,8 @@ void FEngineLoop::Exit()
 	{
 		RenderDevice->Shutdown();
 	}
+
+	FLog::Shutdown();
 }
 
 void FEngineLoop::BeginBackbufferPass()

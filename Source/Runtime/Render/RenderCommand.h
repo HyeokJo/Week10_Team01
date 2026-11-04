@@ -3,7 +3,7 @@
 #include "RenderDevice.h"
 
 class FBuffer;
-class UStaticMesh;
+class FMeshRenderResource;
 class UTexture2D;
 class FShaderProgram;
 class FVertexShader;
@@ -45,7 +45,7 @@ public:
 
 	static void BindPipelineState(const FPipelineState& PipelineState);
 
-	static void BindMesh(UStaticMesh* Mesh, uint32 LODIndex = 0);
+	static void BindMesh(const FMeshRenderResource* Mesh, uint32 LODIndex = 0);
 
 	static void BindShaderProgram(FShaderProgram* Shader);
 

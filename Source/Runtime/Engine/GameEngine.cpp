@@ -147,8 +147,8 @@ void UGameEngine::Tick(float DeltaTime)
 	UIInfo.DepthStencil.Texture = nullptr;
 
 	RenderCommand::BeginRenderPass(UIInfo);
-	GameViewport->CollectDrawList(Width, Height);
-	GameViewport->Draw(Width, Height, TextRenderer);
+	GameViewport->CollectDrawList(static_cast<float>(Width), static_cast<float>(Height));
+	GameViewport->Draw(static_cast<float>(Width), static_cast<float>(Height), TextRenderer);
 	RenderCommand::EndRenderPass();
 	// ================================
 
