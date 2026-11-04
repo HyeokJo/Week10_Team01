@@ -4,6 +4,75 @@
         "PersistentLevel": {
             "Actors": [
                 {
+                    "Class": "ASkeletalMeshActor",
+                    "Components": [
+                        {
+                            "Class": "USceneComponent",
+                            "Name": "DefaultSceneRoot",
+                            "Parent": "",
+                            "Properties": {
+                                "Transform": {
+                                    "Location": {
+                                        "X": 0.0,
+                                        "Y": 0.0,
+                                        "Z": 0.0
+                                    },
+                                    "Rotation": {
+                                        "Pitch": 0.0,
+                                        "Roll": 0.0,
+                                        "Yaw": 0.0
+                                    },
+                                    "Scale": {
+                                        "X": 1.0,
+                                        "Y": 1.0,
+                                        "Z": 1.0
+                                    }
+                                },
+                                "bHiddenInGame": false
+                            }
+                        },
+                        {
+                            "Class": "USkeletalMeshComponent",
+                            "Name": "USkeletalMeshComponent",
+                            "OverrideMaterials": [],
+                            "Parent": "",
+                            "Properties": {
+                                "ShowBeginOverlapLog": false,
+                                "ShowEndOverlapLog": false,
+                                "ShowHitLog": false,
+                                "SkeletalMesh": "Models/StylizedMale/SM_StylizedMale_UE.fbx",
+                                "Transform": {
+                                    "Location": {
+                                        "X": -1.0292422771453857,
+                                        "Y": -0.9422106146812439,
+                                        "Z": 2.384185791015625e-07
+                                    },
+                                    "Rotation": {
+                                        "Pitch": 0.0,
+                                        "Roll": 0.0,
+                                        "Yaw": 0.0
+                                    },
+                                    "Scale": {
+                                        "X": 1.0,
+                                        "Y": 1.0,
+                                        "Z": 1.0
+                                    }
+                                },
+                                "bBlockComponet": false,
+                                "bCastShadow": true,
+                                "bGenerateOverlapEvents": true,
+                                "bHiddenInGame": false,
+                                "bReceiveDecal": true,
+                                "bReceiveShadow": true,
+                                "bVisible": true
+                            }
+                        }
+                    ],
+                    "Name": "ASkeletalMeshActor_0",
+                    "Properties": {},
+                    "RootComponent": "USkeletalMeshComponent"
+                },
+                {
                     "Class": "ADirectionalLightActor",
                     "Components": [
                         {
@@ -268,6 +337,181 @@
                     "RootComponent": "UAmbientLightComponent"
                 },
                 {
+                    "Class": "ADecalActor",
+                    "Components": [
+                        {
+                            "Class": "USceneComponent",
+                            "Name": "DefaultSceneRoot",
+                            "Parent": "",
+                            "Properties": {
+                                "Transform": {
+                                    "Location": {
+                                        "X": 0.1180540919303894,
+                                        "Y": -2.294938564300537,
+                                        "Z": 1.3367935419082642
+                                    },
+                                    "Rotation": {
+                                        "Pitch": 0.0,
+                                        "Roll": 0.0,
+                                        "Yaw": -178.53915405273438
+                                    },
+                                    "Scale": {
+                                        "X": 1.2394875288009644,
+                                        "Y": 0.6820000410079956,
+                                        "Z": 0.6820000410079956
+                                    }
+                                },
+                                "bHiddenInGame": false
+                            }
+                        },
+                        {
+                            "Class": "UDecalComponent",
+                            "DecalMaterial": {
+                                "Base": "DefaultMaterial",
+                                "Instance": {
+                                    "BaseColor": {
+                                        "A": 1.0,
+                                        "B": 1.0,
+                                        "G": 1.0,
+                                        "R": 1.0
+                                    },
+                                    "BlendState": "Opaque",
+                                    "Properties": {},
+                                    "SamplerState": "LinearClamp",
+                                    "Shininess": 32.0,
+                                    "SpecularColor": {
+                                        "A": 1.0,
+                                        "B": 0.5,
+                                        "G": 0.5,
+                                        "R": 0.5
+                                    },
+                                    "Textures": [
+                                        "Assets/Textures/DecalProjectionTest.png"
+                                    ],
+                                    "UVScrollSpeed": [
+                                        0.0,
+                                        0.0
+                                    ],
+                                    "bFlipNormalGreen": false
+                                }
+                            },
+                            "Name": "DecalComponent",
+                            "Parent": "DefaultSceneRoot",
+                            "Properties": {
+                                "AngleFadeEnd": 80.0,
+                                "AngleFadeStart": 60.0,
+                                "DecalColor": {
+                                    "A": 1.0,
+                                    "B": 1.0,
+                                    "G": 1.0,
+                                    "R": 1.0
+                                },
+                                "DecalSize": {
+                                    "X": 1.0,
+                                    "Y": 1.0,
+                                    "Z": 1.0
+                                },
+                                "FadeDuration": 0.0,
+                                "FadeInDuration": 0.0,
+                                "FadeInStartDelay": 0.0,
+                                "FadeOutDuration": 0.30000001192092896,
+                                "FadeScreenSize": 0.0,
+                                "FadeStartDelay": 0.0,
+                                "NormalTexturePath": "",
+                                "Opacity": 1.0,
+                                "SortOrder": 0,
+                                "TexturePath": "Assets/Textures/DecalProjectionTest.png",
+                                "Transform": {
+                                    "Location": {
+                                        "X": -0.005092415027320385,
+                                        "Y": -0.362909197807312,
+                                        "Z": -0.24102997779846191
+                                    },
+                                    "Rotation": {
+                                        "Pitch": 0.0,
+                                        "Roll": 0.0,
+                                        "Yaw": 0.0
+                                    },
+                                    "Scale": {
+                                        "X": 0.3149999976158142,
+                                        "Y": 0.3149999976158142,
+                                        "Z": 0.3149999976158142
+                                    }
+                                },
+                                "bDestroyOwnerAfterFade": true,
+                                "bFlipNormalGreen": false,
+                                "bHiddenInGame": false
+                            }
+                        },
+                        {
+                            "Class": "UBillboardComponent",
+                            "Material": {
+                                "Base": "BillboardMaterial",
+                                "Instance": {
+                                    "BaseColor": {
+                                        "A": 1.0,
+                                        "B": 1.0,
+                                        "G": 1.0,
+                                        "R": 1.0
+                                    },
+                                    "BlendState": "AlphaBlend",
+                                    "Properties": {},
+                                    "SamplerState": "LinearClamp",
+                                    "Shininess": 32.0,
+                                    "SpecularColor": {
+                                        "A": 1.0,
+                                        "B": 0.5,
+                                        "G": 0.5,
+                                        "R": 0.5
+                                    },
+                                    "Textures": [
+                                        "Resources/Icons/S_DecalActorIcon.png"
+                                    ],
+                                    "UVScrollSpeed": [
+                                        0.0,
+                                        0.0
+                                    ],
+                                    "bFlipNormalGreen": false
+                                }
+                            },
+                            "Name": "UBillboardComponent",
+                            "Parent": "DecalComponent",
+                            "Properties": {
+                                "ShowBeginOverlapLog": false,
+                                "ShowEndOverlapLog": false,
+                                "ShowHitLog": false,
+                                "Transform": {
+                                    "Location": {
+                                        "X": 0.0,
+                                        "Y": 0.0,
+                                        "Z": 0.0
+                                    },
+                                    "Rotation": {
+                                        "Pitch": 0.0,
+                                        "Roll": 0.0,
+                                        "Yaw": 0.0
+                                    },
+                                    "Scale": {
+                                        "X": 1.0,
+                                        "Y": 1.0,
+                                        "Z": 1.0
+                                    }
+                                },
+                                "bBlockComponet": false,
+                                "bCastShadow": true,
+                                "bGenerateOverlapEvents": true,
+                                "bHiddenInGame": true,
+                                "bReceiveDecal": true,
+                                "bReceiveShadow": true,
+                                "bVisible": true
+                            }
+                        }
+                    ],
+                    "Name": "ADecalActor_0",
+                    "Properties": {},
+                    "RootComponent": "DefaultSceneRoot"
+                },
+                {
                     "Class": "ASkeletalMeshActor",
                     "Components": [
                         {
@@ -298,98 +542,7 @@
                         {
                             "Class": "USkeletalMeshComponent",
                             "Name": "USkeletalMeshComponent",
-                            "OverrideMaterials": [
-                                {
-                                    "Base": "DefaultMaterial",
-                                    "Instance": {
-                                        "BaseColor": {
-                                            "A": 1.0,
-                                            "B": 0.800000011920929,
-                                            "G": 0.800000011920929,
-                                            "R": 0.800000011920929
-                                        },
-                                        "BlendState": "Opaque",
-                                        "Properties": {},
-                                        "SamplerState": "LinearClamp",
-                                        "Shininess": 25.0,
-                                        "SpecularColor": {
-                                            "A": 1.0,
-                                            "B": 0.20000000298023224,
-                                            "G": 0.20000000298023224,
-                                            "R": 0.20000000298023224
-                                        },
-                                        "Textures": [
-                                            "Assets/Models/StylizedMale/T_Armor_BaseColor.png",
-                                            "Assets/Models/StylizedMale/T_Armor_Normal_DirectX.png"
-                                        ],
-                                        "UVScrollSpeed": [
-                                            0.0,
-                                            0.0
-                                        ],
-                                        "bFlipNormalGreen": false
-                                    }
-                                },
-                                {
-                                    "Base": "DefaultMaterial",
-                                    "Instance": {
-                                        "BaseColor": {
-                                            "A": 1.0,
-                                            "B": 0.800000011920929,
-                                            "G": 0.800000011920929,
-                                            "R": 0.800000011920929
-                                        },
-                                        "BlendState": "Opaque",
-                                        "Properties": {},
-                                        "SamplerState": "LinearClamp",
-                                        "Shininess": 25.0,
-                                        "SpecularColor": {
-                                            "A": 1.0,
-                                            "B": 0.20000000298023224,
-                                            "G": 0.20000000298023224,
-                                            "R": 0.20000000298023224
-                                        },
-                                        "Textures": [
-                                            "Assets/Models/StylizedMale/T_Cloth_BaseColor.png",
-                                            "Assets/Models/StylizedMale/T_Cloth_Normal_DirectX.png"
-                                        ],
-                                        "UVScrollSpeed": [
-                                            0.0,
-                                            0.0
-                                        ],
-                                        "bFlipNormalGreen": false
-                                    }
-                                },
-                                {
-                                    "Base": "DefaultMaterial",
-                                    "Instance": {
-                                        "BaseColor": {
-                                            "A": 1.0,
-                                            "B": 0.800000011920929,
-                                            "G": 0.800000011920929,
-                                            "R": 0.800000011920929
-                                        },
-                                        "BlendState": "Opaque",
-                                        "Properties": {},
-                                        "SamplerState": "LinearClamp",
-                                        "Shininess": 25.0,
-                                        "SpecularColor": {
-                                            "A": 1.0,
-                                            "B": 0.20000000298023224,
-                                            "G": 0.20000000298023224,
-                                            "R": 0.20000000298023224
-                                        },
-                                        "Textures": [
-                                            "Assets/Models/StylizedMale/T_Organik_BaseColor.png",
-                                            "Assets/Models/StylizedMale/T_Organik_Normal_DirectX.png"
-                                        ],
-                                        "UVScrollSpeed": [
-                                            0.0,
-                                            0.0
-                                        ],
-                                        "bFlipNormalGreen": false
-                                    }
-                                }
-                            ],
+                            "OverrideMaterials": [],
                             "Parent": "",
                             "Properties": {
                                 "ShowBeginOverlapLog": false,
@@ -426,6 +579,679 @@
                     "Name": "ASkeletalMeshActor_1",
                     "Properties": {},
                     "RootComponent": "USkeletalMeshComponent"
+                },
+                {
+                    "Class": "ASkeletalMeshActor",
+                    "Components": [
+                        {
+                            "Class": "USceneComponent",
+                            "Name": "DefaultSceneRoot",
+                            "Parent": "",
+                            "Properties": {
+                                "Transform": {
+                                    "Location": {
+                                        "X": 0.0,
+                                        "Y": 0.0,
+                                        "Z": 0.0
+                                    },
+                                    "Rotation": {
+                                        "Pitch": 0.0,
+                                        "Roll": 0.0,
+                                        "Yaw": 0.0
+                                    },
+                                    "Scale": {
+                                        "X": 1.0,
+                                        "Y": 1.0,
+                                        "Z": 1.0
+                                    }
+                                },
+                                "bHiddenInGame": false
+                            }
+                        },
+                        {
+                            "Class": "USkeletalMeshComponent",
+                            "Name": "USkeletalMeshComponent",
+                            "OverrideMaterials": [],
+                            "Parent": "",
+                            "Properties": {
+                                "ShowBeginOverlapLog": false,
+                                "ShowEndOverlapLog": false,
+                                "ShowHitLog": false,
+                                "SkeletalMesh": "Models/StylizedMale/SM_StylizedMale_UE.fbx",
+                                "Transform": {
+                                    "Location": {
+                                        "X": 0.0,
+                                        "Y": -2.0016026496887207,
+                                        "Z": 0.0
+                                    },
+                                    "Rotation": {
+                                        "Pitch": 0.0,
+                                        "Roll": 0.0,
+                                        "Yaw": 0.0
+                                    },
+                                    "Scale": {
+                                        "X": 1.0,
+                                        "Y": 1.0,
+                                        "Z": 1.0
+                                    }
+                                },
+                                "bBlockComponet": false,
+                                "bCastShadow": true,
+                                "bGenerateOverlapEvents": true,
+                                "bHiddenInGame": false,
+                                "bReceiveDecal": true,
+                                "bReceiveShadow": true,
+                                "bVisible": true
+                            }
+                        }
+                    ],
+                    "Name": "ASkeletalMeshActor_2",
+                    "Properties": {},
+                    "RootComponent": "USkeletalMeshComponent"
+                },
+                {
+                    "Class": "ASkeletalMeshActor",
+                    "Components": [
+                        {
+                            "Class": "USceneComponent",
+                            "Name": "DefaultSceneRoot",
+                            "Parent": "",
+                            "Properties": {
+                                "Transform": {
+                                    "Location": {
+                                        "X": 0.0,
+                                        "Y": 0.0,
+                                        "Z": 0.0
+                                    },
+                                    "Rotation": {
+                                        "Pitch": 0.0,
+                                        "Roll": 0.0,
+                                        "Yaw": 0.0
+                                    },
+                                    "Scale": {
+                                        "X": 1.0,
+                                        "Y": 1.0,
+                                        "Z": 1.0
+                                    }
+                                },
+                                "bHiddenInGame": false
+                            }
+                        },
+                        {
+                            "Class": "USkeletalMeshComponent",
+                            "Name": "USkeletalMeshComponent",
+                            "OverrideMaterials": [],
+                            "Parent": "",
+                            "Properties": {
+                                "ShowBeginOverlapLog": false,
+                                "ShowEndOverlapLog": false,
+                                "ShowHitLog": false,
+                                "SkeletalMesh": "Models/StylizedMale/SM_StylizedMale_UE.fbx",
+                                "Transform": {
+                                    "Location": {
+                                        "X": -1.0925037860870361,
+                                        "Y": -2.225735902786255,
+                                        "Z": 2.384185791015625e-07
+                                    },
+                                    "Rotation": {
+                                        "Pitch": 0.0,
+                                        "Roll": 0.0,
+                                        "Yaw": 0.0
+                                    },
+                                    "Scale": {
+                                        "X": 1.0,
+                                        "Y": 1.0,
+                                        "Z": 1.0
+                                    }
+                                },
+                                "bBlockComponet": false,
+                                "bCastShadow": true,
+                                "bGenerateOverlapEvents": true,
+                                "bHiddenInGame": false,
+                                "bReceiveDecal": true,
+                                "bReceiveShadow": true,
+                                "bVisible": true
+                            }
+                        }
+                    ],
+                    "Name": "ASkeletalMeshActor_3",
+                    "Properties": {},
+                    "RootComponent": "USkeletalMeshComponent"
+                },
+                {
+                    "Class": "ADecalActor",
+                    "Components": [
+                        {
+                            "Class": "USceneComponent",
+                            "Name": "DefaultSceneRoot",
+                            "Parent": "",
+                            "Properties": {
+                                "Transform": {
+                                    "Location": {
+                                        "X": 0.0873388797044754,
+                                        "Y": -1.0905561447143555,
+                                        "Z": 1.3367935419082642
+                                    },
+                                    "Rotation": {
+                                        "Pitch": 0.0,
+                                        "Roll": 0.0,
+                                        "Yaw": -178.53915405273438
+                                    },
+                                    "Scale": {
+                                        "X": 1.2394875288009644,
+                                        "Y": 0.6820000410079956,
+                                        "Z": 0.6820000410079956
+                                    }
+                                },
+                                "bHiddenInGame": false
+                            }
+                        },
+                        {
+                            "Class": "UDecalComponent",
+                            "DecalMaterial": {
+                                "Base": "DefaultMaterial",
+                                "Instance": {
+                                    "BaseColor": {
+                                        "A": 1.0,
+                                        "B": 1.0,
+                                        "G": 1.0,
+                                        "R": 1.0
+                                    },
+                                    "BlendState": "Opaque",
+                                    "Properties": {},
+                                    "SamplerState": "LinearClamp",
+                                    "Shininess": 32.0,
+                                    "SpecularColor": {
+                                        "A": 1.0,
+                                        "B": 0.5,
+                                        "G": 0.5,
+                                        "R": 0.5
+                                    },
+                                    "Textures": [
+                                        "Assets/Textures/DecalProjectionTest.png"
+                                    ],
+                                    "UVScrollSpeed": [
+                                        0.0,
+                                        0.0
+                                    ],
+                                    "bFlipNormalGreen": false
+                                }
+                            },
+                            "Name": "DecalComponent",
+                            "Parent": "DefaultSceneRoot",
+                            "Properties": {
+                                "AngleFadeEnd": 90.0,
+                                "AngleFadeStart": 40.29999923706055,
+                                "DecalColor": {
+                                    "A": 1.0,
+                                    "B": 1.0,
+                                    "G": 1.0,
+                                    "R": 1.0
+                                },
+                                "DecalSize": {
+                                    "X": 1.0,
+                                    "Y": 1.0,
+                                    "Z": 1.0
+                                },
+                                "FadeDuration": 3.0,
+                                "FadeInDuration": 3.0,
+                                "FadeInStartDelay": 0.0,
+                                "FadeOutDuration": 0.30000001192092896,
+                                "FadeScreenSize": 0.0,
+                                "FadeStartDelay": 5.0,
+                                "NormalTexturePath": "",
+                                "Opacity": 1.0,
+                                "SortOrder": 0,
+                                "TexturePath": "Assets/Textures/DecalProjectionTest.png",
+                                "Transform": {
+                                    "Location": {
+                                        "X": -0.005092415027320385,
+                                        "Y": -0.362909197807312,
+                                        "Z": -0.24102997779846191
+                                    },
+                                    "Rotation": {
+                                        "Pitch": 0.0,
+                                        "Roll": 0.0,
+                                        "Yaw": 0.0
+                                    },
+                                    "Scale": {
+                                        "X": 0.3149999976158142,
+                                        "Y": 0.3149999976158142,
+                                        "Z": 0.3149999976158142
+                                    }
+                                },
+                                "bDestroyOwnerAfterFade": true,
+                                "bFlipNormalGreen": false,
+                                "bHiddenInGame": false
+                            }
+                        },
+                        {
+                            "Class": "UBillboardComponent",
+                            "Material": {
+                                "Base": "BillboardMaterial",
+                                "Instance": {
+                                    "BaseColor": {
+                                        "A": 1.0,
+                                        "B": 1.0,
+                                        "G": 1.0,
+                                        "R": 1.0
+                                    },
+                                    "BlendState": "AlphaBlend",
+                                    "Properties": {},
+                                    "SamplerState": "LinearClamp",
+                                    "Shininess": 32.0,
+                                    "SpecularColor": {
+                                        "A": 1.0,
+                                        "B": 0.5,
+                                        "G": 0.5,
+                                        "R": 0.5
+                                    },
+                                    "Textures": [
+                                        "Resources/Icons/S_DecalActorIcon.png"
+                                    ],
+                                    "UVScrollSpeed": [
+                                        0.0,
+                                        0.0
+                                    ],
+                                    "bFlipNormalGreen": false
+                                }
+                            },
+                            "Name": "UBillboardComponent",
+                            "Parent": "DecalComponent",
+                            "Properties": {
+                                "ShowBeginOverlapLog": false,
+                                "ShowEndOverlapLog": false,
+                                "ShowHitLog": false,
+                                "Transform": {
+                                    "Location": {
+                                        "X": 0.0,
+                                        "Y": 0.0,
+                                        "Z": 0.0
+                                    },
+                                    "Rotation": {
+                                        "Pitch": 0.0,
+                                        "Roll": 0.0,
+                                        "Yaw": 0.0
+                                    },
+                                    "Scale": {
+                                        "X": 1.0,
+                                        "Y": 1.0,
+                                        "Z": 1.0
+                                    }
+                                },
+                                "bBlockComponet": false,
+                                "bCastShadow": true,
+                                "bGenerateOverlapEvents": true,
+                                "bHiddenInGame": true,
+                                "bReceiveDecal": true,
+                                "bReceiveShadow": true,
+                                "bVisible": true
+                            }
+                        }
+                    ],
+                    "Name": "ADecalActor_1",
+                    "Properties": {},
+                    "RootComponent": "DefaultSceneRoot"
+                },
+                {
+                    "Class": "ADecalActor",
+                    "Components": [
+                        {
+                            "Class": "USceneComponent",
+                            "Name": "DefaultSceneRoot",
+                            "Parent": "",
+                            "Properties": {
+                                "Transform": {
+                                    "Location": {
+                                        "X": -0.9276439547538757,
+                                        "Y": -1.1164411306381226,
+                                        "Z": 1.3367935419082642
+                                    },
+                                    "Rotation": {
+                                        "Pitch": 0.0,
+                                        "Roll": 0.0,
+                                        "Yaw": -178.53915405273438
+                                    },
+                                    "Scale": {
+                                        "X": 1.2394875288009644,
+                                        "Y": 0.6820000410079956,
+                                        "Z": 0.6820000410079956
+                                    }
+                                },
+                                "bHiddenInGame": false
+                            }
+                        },
+                        {
+                            "Class": "UDecalComponent",
+                            "DecalMaterial": {
+                                "Base": "DefaultMaterial",
+                                "Instance": {
+                                    "BaseColor": {
+                                        "A": 1.0,
+                                        "B": 1.0,
+                                        "G": 1.0,
+                                        "R": 1.0
+                                    },
+                                    "BlendState": "Opaque",
+                                    "Properties": {},
+                                    "SamplerState": "LinearClamp",
+                                    "Shininess": 32.0,
+                                    "SpecularColor": {
+                                        "A": 1.0,
+                                        "B": 0.5,
+                                        "G": 0.5,
+                                        "R": 0.5
+                                    },
+                                    "Textures": [
+                                        "Assets/Textures/DecalProjectionTest.png"
+                                    ],
+                                    "UVScrollSpeed": [
+                                        0.0,
+                                        0.0
+                                    ],
+                                    "bFlipNormalGreen": false
+                                }
+                            },
+                            "Name": "DecalComponent",
+                            "Parent": "DefaultSceneRoot",
+                            "Properties": {
+                                "AngleFadeEnd": 80.0,
+                                "AngleFadeStart": 60.0,
+                                "DecalColor": {
+                                    "A": 1.0,
+                                    "B": 1.0,
+                                    "G": 1.0,
+                                    "R": 1.0
+                                },
+                                "DecalSize": {
+                                    "X": 1.0,
+                                    "Y": 1.0,
+                                    "Z": 1.0
+                                },
+                                "FadeDuration": 0.0,
+                                "FadeInDuration": 0.0,
+                                "FadeInStartDelay": 0.0,
+                                "FadeOutDuration": 0.30000001192092896,
+                                "FadeScreenSize": 0.0,
+                                "FadeStartDelay": 0.0,
+                                "NormalTexturePath": "",
+                                "Opacity": 1.0,
+                                "SortOrder": 0,
+                                "TexturePath": "Assets/Textures/DecalProjectionTest.png",
+                                "Transform": {
+                                    "Location": {
+                                        "X": -0.005092415027320385,
+                                        "Y": -0.362909197807312,
+                                        "Z": -0.24102997779846191
+                                    },
+                                    "Rotation": {
+                                        "Pitch": 0.0,
+                                        "Roll": 0.0,
+                                        "Yaw": 0.0
+                                    },
+                                    "Scale": {
+                                        "X": 0.3149999976158142,
+                                        "Y": 0.3149999976158142,
+                                        "Z": 0.3149999976158142
+                                    }
+                                },
+                                "bDestroyOwnerAfterFade": true,
+                                "bFlipNormalGreen": false,
+                                "bHiddenInGame": false
+                            }
+                        },
+                        {
+                            "Class": "UBillboardComponent",
+                            "Material": {
+                                "Base": "BillboardMaterial",
+                                "Instance": {
+                                    "BaseColor": {
+                                        "A": 1.0,
+                                        "B": 1.0,
+                                        "G": 1.0,
+                                        "R": 1.0
+                                    },
+                                    "BlendState": "AlphaBlend",
+                                    "Properties": {},
+                                    "SamplerState": "LinearClamp",
+                                    "Shininess": 32.0,
+                                    "SpecularColor": {
+                                        "A": 1.0,
+                                        "B": 0.5,
+                                        "G": 0.5,
+                                        "R": 0.5
+                                    },
+                                    "Textures": [
+                                        "Resources/Icons/S_DecalActorIcon.png"
+                                    ],
+                                    "UVScrollSpeed": [
+                                        0.0,
+                                        0.0
+                                    ],
+                                    "bFlipNormalGreen": false
+                                }
+                            },
+                            "Name": "UBillboardComponent",
+                            "Parent": "DecalComponent",
+                            "Properties": {
+                                "ShowBeginOverlapLog": false,
+                                "ShowEndOverlapLog": false,
+                                "ShowHitLog": false,
+                                "Transform": {
+                                    "Location": {
+                                        "X": 0.0,
+                                        "Y": 0.0,
+                                        "Z": 0.0
+                                    },
+                                    "Rotation": {
+                                        "Pitch": 0.0,
+                                        "Roll": 0.0,
+                                        "Yaw": 0.0
+                                    },
+                                    "Scale": {
+                                        "X": 1.0,
+                                        "Y": 1.0,
+                                        "Z": 1.0
+                                    }
+                                },
+                                "bBlockComponet": false,
+                                "bCastShadow": true,
+                                "bGenerateOverlapEvents": true,
+                                "bHiddenInGame": true,
+                                "bReceiveDecal": true,
+                                "bReceiveShadow": true,
+                                "bVisible": true
+                            }
+                        }
+                    ],
+                    "Name": "ADecalActor_2",
+                    "Properties": {},
+                    "RootComponent": "DefaultSceneRoot"
+                },
+                {
+                    "Class": "AFakeSpotLightActor",
+                    "Components": [
+                        {
+                            "Class": "USceneComponent",
+                            "Name": "DefaultSceneRoot",
+                            "Parent": "",
+                            "Properties": {
+                                "Transform": {
+                                    "Location": {
+                                        "X": 1.8863708817207225e-08,
+                                        "Y": -2.8259997367858887,
+                                        "Z": 2.715717077255249
+                                    },
+                                    "Rotation": {
+                                        "Pitch": 67.4651107788086,
+                                        "Roll": 180.0000457763672,
+                                        "Yaw": 180.0000457763672
+                                    },
+                                    "Scale": {
+                                        "X": 1.0,
+                                        "Y": 1.0,
+                                        "Z": 1.0
+                                    }
+                                },
+                                "bHiddenInGame": false
+                            }
+                        },
+                        {
+                            "Class": "UDecalComponent",
+                            "DecalMaterial": {
+                                "Base": "DefaultMaterial",
+                                "Instance": {
+                                    "BaseColor": {
+                                        "A": 1.0,
+                                        "B": 1.0,
+                                        "G": 1.0,
+                                        "R": 1.0
+                                    },
+                                    "BlendState": "Opaque",
+                                    "Properties": {},
+                                    "SamplerState": "LinearClamp",
+                                    "Shininess": 32.0,
+                                    "SpecularColor": {
+                                        "A": 1.0,
+                                        "B": 0.5,
+                                        "G": 0.5,
+                                        "R": 0.5
+                                    },
+                                    "Textures": [
+                                        "Resources/Textures/FakeSpotLightMask.png"
+                                    ],
+                                    "UVScrollSpeed": [
+                                        0.0,
+                                        0.0
+                                    ],
+                                    "bFlipNormalGreen": false
+                                }
+                            },
+                            "Name": "UDecalComponent",
+                            "Parent": "DefaultSceneRoot",
+                            "Properties": {
+                                "AngleFadeEnd": 80.0,
+                                "AngleFadeStart": 60.0,
+                                "DecalColor": {
+                                    "A": 1.0,
+                                    "B": 1.0,
+                                    "G": 1.0,
+                                    "R": 1.0
+                                },
+                                "DecalSize": {
+                                    "X": 2.6500000953674316,
+                                    "Y": 1.2999999523162842,
+                                    "Z": 1.2999999523162842
+                                },
+                                "FadeDuration": 0.0,
+                                "FadeInDuration": 0.0,
+                                "FadeInStartDelay": 0.0,
+                                "FadeOutDuration": 0.30000001192092896,
+                                "FadeScreenSize": 0.0,
+                                "FadeStartDelay": 0.0,
+                                "NormalTexturePath": "",
+                                "Opacity": 0.699999988079071,
+                                "SortOrder": 0,
+                                "TexturePath": "",
+                                "Transform": {
+                                    "Location": {
+                                        "X": 2.6500000953674316,
+                                        "Y": 0.0,
+                                        "Z": 0.0
+                                    },
+                                    "Rotation": {
+                                        "Pitch": 0.0,
+                                        "Roll": 0.0,
+                                        "Yaw": 0.0
+                                    },
+                                    "Scale": {
+                                        "X": 1.0,
+                                        "Y": 1.0,
+                                        "Z": 1.0
+                                    }
+                                },
+                                "bDestroyOwnerAfterFade": true,
+                                "bFlipNormalGreen": false,
+                                "bHiddenInGame": false
+                            }
+                        },
+                        {
+                            "Class": "UBillboardComponent",
+                            "Material": {
+                                "Base": "BillboardMaterial",
+                                "Instance": {
+                                    "BaseColor": {
+                                        "A": 1.0,
+                                        "B": 1.0,
+                                        "G": 1.0,
+                                        "R": 1.0
+                                    },
+                                    "BlendState": "AlphaBlend",
+                                    "Properties": {},
+                                    "SamplerState": "LinearClamp",
+                                    "Shininess": 32.0,
+                                    "SpecularColor": {
+                                        "A": 1.0,
+                                        "B": 0.5,
+                                        "G": 0.5,
+                                        "R": 0.5
+                                    },
+                                    "Textures": [
+                                        "Resources/Icons/SpotLight_64x.png"
+                                    ],
+                                    "UVScrollSpeed": [
+                                        0.0,
+                                        0.0
+                                    ],
+                                    "bFlipNormalGreen": false
+                                }
+                            },
+                            "Name": "UBillboardComponent",
+                            "Parent": "DefaultSceneRoot",
+                            "Properties": {
+                                "ShowBeginOverlapLog": false,
+                                "ShowEndOverlapLog": false,
+                                "ShowHitLog": false,
+                                "Transform": {
+                                    "Location": {
+                                        "X": 0.0,
+                                        "Y": 0.0,
+                                        "Z": 0.0
+                                    },
+                                    "Rotation": {
+                                        "Pitch": 0.0,
+                                        "Roll": 0.0,
+                                        "Yaw": 0.0
+                                    },
+                                    "Scale": {
+                                        "X": 1.0,
+                                        "Y": 1.0,
+                                        "Z": 1.0
+                                    }
+                                },
+                                "bBlockComponet": false,
+                                "bCastShadow": true,
+                                "bGenerateOverlapEvents": true,
+                                "bHiddenInGame": true,
+                                "bReceiveDecal": true,
+                                "bReceiveShadow": true,
+                                "bVisible": true
+                            }
+                        }
+                    ],
+                    "Name": "AFakeSpotLightActor_0",
+                    "Properties": {
+                        "Intensity": 0.699999988079071,
+                        "LightColor": {
+                            "A": 255,
+                            "B": 255,
+                            "G": 255,
+                            "R": 255
+                        },
+                        "Radius": 1.2999999523162842,
+                        "Range": 5.300000190734863
+                    },
+                    "RootComponent": "DefaultSceneRoot"
                 },
                 {
                     "Class": "AStaticMeshActor",
@@ -528,7 +1354,7 @@
                     "RootComponent": "UStaticMeshComponent"
                 },
                 {
-                    "Class": "ASkeletalMeshActor",
+                    "Class": "AStaticMeshActor",
                     "Components": [
                         {
                             "Class": "USceneComponent",
@@ -557,24 +1383,24 @@
                         },
                         {
                             "Class": "UStaticMeshComponent",
-                            "Name": "UStaticMeshComponent_0",
+                            "Name": "UStaticMeshComponent",
                             "OverrideMaterials": [],
                             "Parent": "",
                             "Properties": {
                                 "ShowBeginOverlapLog": false,
                                 "ShowEndOverlapLog": false,
                                 "ShowHitLog": false,
-                                "StaticMesh": "Cube",
+                                "StaticMesh": "Models/Patrick/Patrick.obj",
                                 "Transform": {
                                     "Location": {
-                                        "X": 0.0,
-                                        "Y": -2.5280370712280273,
-                                        "Z": 0.0
+                                        "X": -0.10036919265985489,
+                                        "Y": -2.264622211456299,
+                                        "Z": 0.9595934152603149
                                     },
                                     "Rotation": {
                                         "Pitch": -0.0,
                                         "Roll": 0.0,
-                                        "Yaw": 0.0
+                                        "Yaw": -177.07127380371094
                                     },
                                     "Scale": {
                                         "X": 1.0,
@@ -592,9 +1418,9 @@
                             }
                         }
                     ],
-                    "Name": "ASkeletalMeshActor_6",
+                    "Name": "AStaticMeshActor_1",
                     "Properties": {},
-                    "RootComponent": "UStaticMeshComponent_0"
+                    "RootComponent": "UStaticMeshComponent"
                 }
             ],
             "Properties": {}
