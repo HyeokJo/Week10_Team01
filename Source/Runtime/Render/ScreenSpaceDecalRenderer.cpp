@@ -160,7 +160,7 @@ bool FScreenSpaceDecalRenderer::EnsureInstanceCapacity(uint32 Count)
 }
 
 void FScreenSpaceDecalRenderer::OnRender(FTexture2D* DepthTexture, const FMatrix& ViewProjection,
-    const TArray<const FDecalSceneProxy*>& Decals, const FViewportSettings& Viewport, bool bOrthographic, bool bWriteNormals)
+    const TArray<const FDecalSceneProxy*>& Decals, const FViewportSettings& Viewport, bool bOrthographic, bool bWriteNormals, FTexture2D* ReceiverNormals)
 {
     if (!Shader || !ViewConstantBuffer || !ViewConstantBuffer->GetBuffer() || !BatchConstantBuffer || !BatchConstantBuffer->GetBuffer() ||
         !DepthTexture || !DepthTexture->GetStencilSRV() || Viewport.Width == 0 || Viewport.Height == 0)
@@ -213,11 +213,13 @@ void FScreenSpaceDecalRenderer::OnRender(FTexture2D* DepthTexture, const FMatrix
     Constants.InverseViewProjection = ViewProjection.Inverse();
     Constants.ViewportOrigin = FVector2(static_cast<float>(Viewport.StartX), static_cast<float>(Viewport.StartY));
     Constants.InverseViewportSize = FVector2(InvWidth, InvHeight);
+    Constants.bHasReceiverNormals = ReceiverNormals ? 1u : 0u;
 
     PipelineState.Shader = bWriteNormals ? Shader : ColorOnlyShader;
     RenderCommand::BindPipelineState(PipelineState);
     RenderCommand::BindShaderResource(0, DepthTexture, EShaderBindFlagBits::Pixel);
     RenderCommand::BindStencilShaderResource(2, DepthTexture, EShaderBindFlagBits::Pixel);
+    RenderCommand::BindShaderResource(3, ReceiverNormals, EShaderBindFlagBits::Pixel, true);
     RenderCommand::UpdateBufferData(ViewConstantBuffer.get(), &Constants);
     RenderCommand::BindConstantBuffer(0, ViewConstantBuffer.get(), EShaderBindFlagBits::Pixel);
     RenderCommand::BindConstantBuffer(1, BatchConstantBuffer.get(), EShaderBindFlagBits::Vertex);
@@ -237,4 +239,6 @@ void FScreenSpaceDecalRenderer::OnRender(FTexture2D* DepthTexture, const FMatrix
     }
     RenderCommand::UnbindShaderResource(InstanceResourceSlot, EShaderBindFlagBits::Vertex | EShaderBindFlagBits::Pixel);
     RenderCommand::UnbindShaderResource(4, EShaderBindFlagBits::Pixel);
+    // The receiver-normal target becomes the display output during gamma encoding.
+    RenderCommand::UnbindShaderResource(3, EShaderBindFlagBits::Pixel);
 }

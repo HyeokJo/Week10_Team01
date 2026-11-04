@@ -681,12 +681,16 @@ bool UWorld::LineTraceSingle(const FRay& WorldRay, FHitResult& OutHit,
 				};
 
 				float T = InOutNearestT;
-				if (!RayIntersectsMesh(LocalRay, *PickingData, T))
+				FVector LocalNormal;
+				if (!RayIntersectsMesh(LocalRay, *PickingData, T, &LocalNormal))
 					return false;
 
 				OutHit.HitComponent = Proxy->GetComponent();
 				OutHit.Distance = T;
 				OutHit.ImpactPoint = WorldRay.Origin + WorldRay.Direction * T;
+				OutHit.ImpactNormal = Proxy->GetNormalMatrix().TransformVector(LocalNormal).GetSafeNormal();
+				if (OutHit.ImpactNormal.Dot(WorldRay.Direction) > 0.f)
+					OutHit.ImpactNormal *= -1.f;
 				InOutNearestT = T;
 				return true;
 			}
@@ -714,6 +718,7 @@ bool UWorld::LineTraceSingle(const FRay& WorldRay, FHitResult& OutHit,
 				}
 
 				OutHit.HitComponent = Billboard;
+				OutHit.ImpactNormal = FVector::ZeroVector;
 				OutHit.Distance = T;
 				OutHit.ImpactPoint = WorldRay.Origin + WorldRay.Direction * T;
 				InOutNearestT = T;
@@ -733,6 +738,7 @@ bool UWorld::LineTraceSingle(const FRay& WorldRay, FHitResult& OutHit,
 			}
 
 			OutHit.HitComponent = Component;
+			OutHit.ImpactNormal = FVector::ZeroVector;
 			OutHit.Distance = T;
 			OutHit.ImpactPoint = WorldRay.Origin + WorldRay.Direction * T;
 			InOutNearestT = T;

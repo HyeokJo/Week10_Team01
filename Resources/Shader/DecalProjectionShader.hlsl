@@ -8,6 +8,7 @@
 Texture2D<float> SceneDepth : register(t0);
 Texture2D<float4> DecalTexture : register(t1);
 Texture2D<uint2> DecalReceiverMask : register(t2);
+Texture2D<float4> ReceiverNormals : register(t3);
 Texture2D<float4> DecalNormalTexture : register(t4);
 SamplerState DecalSampler : register(s0);
 
@@ -16,6 +17,8 @@ cbuffer DecalViewConstants : register(b0)
     matrix InverseViewProjection;
     float2 ViewportOrigin;
     float2 InverseViewportSize;
+    uint bHasReceiverNormals;
+    uint3 ViewPadding;
 };
 
 cbuffer DecalBatchConstants : register(b1)
@@ -91,7 +94,10 @@ float3 ReconstructSurfaceNormal(int2 Pixel, float Depth, float3 PositionWS)
     float4 NeighborY = ReconstructWorldPosition(ErrorU <= ErrorD ? Up : Down, ErrorU <= ErrorD ? DepthU : DepthD);
     if (abs(NeighborX.w) < 1e-6f || abs(NeighborY.w) < 1e-6f)
         return float3(0, 0, 0);
-    return cross(NeighborX.xyz / NeighborX.w - PositionWS, NeighborY.xyz / NeighborY.w - PositionWS);
+    // Keep the tangents pointing screen-right and screen-down regardless of the chosen neighbors.
+    float3 TangentX = (NeighborX.xyz / NeighborX.w - PositionWS) * (ErrorL <= ErrorR ? -1.0f : 1.0f);
+    float3 TangentY = (NeighborY.xyz / NeighborY.w - PositionWS) * (ErrorU <= ErrorD ? -1.0f : 1.0f);
+    return cross(TangentX, TangentY);
 }
 
 float3 ComputeProjectedNormalSlope(float3 Detail, float3 SurfaceNormal, FDecalInstance Decal)
@@ -142,7 +148,14 @@ PSOutput mainPS(PSInput Input)
     if (any(abs(LocalPosition) > Decal.DecalSize))
         discard;
 
-    float3 NormalWS = ReconstructSurfaceNormal(Pixel, Depth, WorldPosition.xyz);
+    float4 StoredNormal = float4(0, 0, 0, 0);
+    if (bHasReceiverNormals != 0u)
+        StoredNormal = ReceiverNormals.Load(int3(Pixel, 0));
+    float3 NormalWS;
+    if (StoredNormal.a > 0.0f)
+        NormalWS = StoredNormal.xyz * 2.0f - 1.0f;
+    else
+        NormalWS = ReconstructSurfaceNormal(Pixel, Depth, WorldPosition.xyz);
     float AngleFade = ComputeDecalAngleFade(NormalWS, Decal.ProjectionDirection, Decal.AngleFadeCosines);
     if (AngleFade <= 0.0f)
         discard;
@@ -156,7 +169,8 @@ PSOutput mainPS(PSInput Input)
         RangeFade = 1.0f - smoothstep(FadeStart, 1.0f, RangeT);
     }
     Color.rgb *= Decal.BaseColor.rgb;
-    Color.a *= saturate(Decal.Opacity) * saturate(Decal.BaseColor.a) * RangeFade * AngleFade;
+    float DepthFade = saturate(4.0f - 4.0f * abs(LocalPosition.x / Decal.DecalSize.x));
+    Color.a *= saturate(Decal.Opacity) * saturate(Decal.BaseColor.a) * RangeFade * AngleFade * DepthFade;
     if (Color.a <= 0.001f)
         discard;
     PSOutput Output;

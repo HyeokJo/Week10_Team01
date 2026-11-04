@@ -42,6 +42,7 @@
 #include "Component/ShapeComponent.h"
 #include "Component/SkeletalMeshDebugComponent.h"
 #include "Component/DecalComponent.h"
+#include "GameFramework/Actor/DecalActor.h"
 #include "Engine/GameViewportClient.h"
 
 namespace
@@ -1189,7 +1190,20 @@ void UEditorEngine::SpawnActorFromToolbar(UClass* Class)
 		+ MultipleViewportsAdapter.GetEngineCameraForward(ViewIndex) * SpawnDistance;
 
 	if (AActor* NewActor = EditorWorld->SpawnActor(Class, NAME_None, &SpawnTransform))
+	{
+		if (ADecalActor* DecalActor = Cast<ADecalActor>(NewActor))
+		{
+			UDecalComponent* Decal = DecalActor->GetDecalComponent();
+			if (Decal->ProjectOntoSurface({MultipleViewportsAdapter.GetEngineCameraLocation(ViewIndex),
+				MultipleViewportsAdapter.GetEngineCameraForward(ViewIndex)}))
+			{
+				const FMatrix SurfaceWorld = Decal->GetWorldMatrix();
+				Decal->SetTransform(FTransform::Identity);
+				NewActor->GetRootComponent()->SetWorldTransform(SurfaceWorld, false);
+			}
+		}
 		OutlinerPanel->SelectActor(NewActor);
+	}
 }
 
 void UEditorEngine::CopySelectedActors()

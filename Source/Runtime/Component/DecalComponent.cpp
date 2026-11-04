@@ -6,6 +6,8 @@
 #include "GameFramework/Actor.h"
 #include "Render/Material.h"
 #include "Render/LineBatcher.h"
+#include "Collision/Ray.h"
+#include "Component/PrimitiveComponent.h"
 
 UDecalComponent::UDecalComponent()
 {
@@ -188,6 +190,32 @@ void UDecalComponent::SetAngleFade(float InStartDegrees, float InEndDegrees)
 	AngleFadeEnd = InEndDegrees;
 	ValidateParameters();
 	MarkSceneProxyDirty();
+}
+
+bool UDecalComponent::ProjectOntoSurface(const FRay& WorldRay)
+{
+	UWorld* World = GetOwner() ? GetOwner()->GetWorld() : nullptr;
+	FHitResult Hit;
+	if (!World || !World->LineTraceSingle(WorldRay, Hit) || !Hit.HitComponent->IsReceiveDecal() ||
+		Hit.ImpactNormal.SizeSquared() < SMALL_NUMBER)
+		return false;
+
+	const FVector Forward = -Hit.ImpactNormal;
+	const FVector Up = std::fabs(Forward.Z) > 0.99f ? FVector::RightVector : FVector::UpVector;
+	const FVector Right = Up.Cross(Forward).GetSafeNormal();
+	const FVector SurfaceUp = Forward.Cross(Right).GetSafeNormal();
+	const FMatrix PreviousWorld = GetWorldMatrix();
+	const float WidthScale = PreviousWorld.TransformVector(FVector::RightVector).Size();
+	const float HeightScale = PreviousWorld.TransformVector(FVector::UpVector).Size();
+	FMatrix SurfaceWorld = FMatrix::Identity;
+	SurfaceWorld.SetAxis(0, Forward);
+	SurfaceWorld.SetAxis(1, Right * WidthScale);
+	SurfaceWorld.SetAxis(2, SurfaceUp * HeightScale);
+	SurfaceWorld.SetOrigin(Hit.ImpactPoint);
+	SetWorldTransform(SurfaceWorld, false);
+	// DecalSize stores half extents. Reset the projection-axis scale to keep depth in world units.
+	SetDecalSize(FVector(0.05f, DecalSize.Y, DecalSize.Z));
+	return true;
 }
 
 void UDecalComponent::FadeIn() { StartManualFade(1.f, FadeInDuration); }

@@ -7,6 +7,7 @@ class FScene;
 class FDecalSceneProxy;
 class UMaterial;
 class FLineBatcher;
+struct FRay;
 
 class UDecalComponent : public USceneComponent
 {
@@ -58,6 +59,8 @@ public:
 	float GetAngleFadeStart() const { return AngleFadeStart; }
 	float GetAngleFadeEnd() const { return AngleFadeEnd; }
 	void SetAngleFade(float InStartDegrees, float InEndDegrees);
+	// Trace a surface and place a thin projector along its geometric normal.
+	bool ProjectOntoSurface(const FRay& WorldRay);
 	void DrawDebug(FLineBatcher* LineBatcher) const;
 
 	using Super::Serialize;
