@@ -526,6 +526,75 @@
                     "Name": "AStaticMeshActor_0",
                     "Properties": {},
                     "RootComponent": "UStaticMeshComponent"
+                },
+                {
+                    "Class": "ASkeletalMeshActor",
+                    "Components": [
+                        {
+                            "Class": "USceneComponent",
+                            "Name": "DefaultSceneRoot",
+                            "Parent": "",
+                            "Properties": {
+                                "Transform": {
+                                    "Location": {
+                                        "X": 0.0,
+                                        "Y": 0.0,
+                                        "Z": 0.0
+                                    },
+                                    "Rotation": {
+                                        "Pitch": 0.0,
+                                        "Roll": 0.0,
+                                        "Yaw": 0.0
+                                    },
+                                    "Scale": {
+                                        "X": 1.0,
+                                        "Y": 1.0,
+                                        "Z": 1.0
+                                    }
+                                },
+                                "bHiddenInGame": false
+                            }
+                        },
+                        {
+                            "Class": "UStaticMeshComponent",
+                            "Name": "UStaticMeshComponent_0",
+                            "OverrideMaterials": [],
+                            "Parent": "",
+                            "Properties": {
+                                "ShowBeginOverlapLog": false,
+                                "ShowEndOverlapLog": false,
+                                "ShowHitLog": false,
+                                "StaticMesh": "Cube",
+                                "Transform": {
+                                    "Location": {
+                                        "X": 0.0,
+                                        "Y": -2.5280370712280273,
+                                        "Z": 0.0
+                                    },
+                                    "Rotation": {
+                                        "Pitch": -0.0,
+                                        "Roll": 0.0,
+                                        "Yaw": 0.0
+                                    },
+                                    "Scale": {
+                                        "X": 1.0,
+                                        "Y": 1.0,
+                                        "Z": 1.0
+                                    }
+                                },
+                                "bBlockComponet": false,
+                                "bCastShadow": true,
+                                "bGenerateOverlapEvents": true,
+                                "bHiddenInGame": false,
+                                "bReceiveDecal": true,
+                                "bReceiveShadow": true,
+                                "bVisible": true
+                            }
+                        }
+                    ],
+                    "Name": "ASkeletalMeshActor_6",
+                    "Properties": {},
+                    "RootComponent": "UStaticMeshComponent_0"
                 }
             ],
             "Properties": {}
