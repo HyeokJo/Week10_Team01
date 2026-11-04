@@ -8,6 +8,7 @@
 
 #include "Component/PrimitiveComponent.h"
 #include "Component/StaticMeshComponent.h"
+#include "Component/SkeletalMeshComponent.h"   // Skinned 컴포넌트도 함께 포함된다
 #include "Component/TextRenderComponent.h"
 #include "Component/ParticleSubUVComponent.h"
 #include "Component/RotatingMovementComponent.h"
@@ -399,6 +400,68 @@ namespace
 		}
 	}
 
+	// DrawMeshSlot의 스켈레탈 버전. 스킨드 컴포넌트면 SetSkeletalMesh를 거쳐 렌더 자원까지 다시 만든다
+	void DrawSkeletalMeshSlot(UObject* Owner, USkeletalMesh** SkeletalMeshPtr)
+	{
+		USkeletalMesh* Current = *SkeletalMeshPtr;
+
+		const FString CurrentPath = Current ? Current->GetPath() : "";
+		const FString CurrentFileName = Current ? GetAssetDisplayName(CurrentPath) : "None";
+
+		ImGui::SetNextItemWidth(-1.0f);
+
+		const bool bOpen = ImGui::BeginCombo("##SkeletalMesh", CurrentFileName.c_str());
+		if (ImGui::IsItemHovered() && Current)
+		{
+			ImGui::SetTooltip("%s", CurrentPath.c_str());
+		}
+		if (!bOpen)
+		{
+			return;
+		}
+
+		auto Select = [&](USkeletalMesh* Mesh)
+			{
+				if (USkinnedMeshComponent* SkinnedComponent = Cast<USkinnedMeshComponent>(Owner))
+					SkinnedComponent->SetSkeletalMesh(Mesh);
+				else
+					*SkeletalMeshPtr = Mesh;
+			};
+
+		if (ImGui::Selectable("None", Current == nullptr))
+		{
+			Select(nullptr);
+		}
+
+		TArray<USkeletalMesh*> Items;
+		for (TObjectIterator<USkeletalMesh> Itr; Itr; ++Itr)
+		{
+			Items.Add(*Itr);
+		}
+		std::sort(Items.begin(), Items.end(), [](USkeletalMesh* A, USkeletalMesh* B)
+			{
+				return _stricmp(GetAssetDisplayName(A->GetPath()).c_str(), GetAssetDisplayName(B->GetPath()).c_str()) < 0;
+			});
+
+		for (USkeletalMesh* Item : Items)
+		{
+			const bool bSelected = (Item == Current);
+			ImGui::PushID(Item);
+			if (ImGui::Selectable(GetAssetDisplayName(Item->GetPath()).c_str(), bSelected))
+			{
+				Select(Item);
+			}
+			if (ImGui::IsItemHovered())
+			{
+				ImGui::SetTooltip("%s", Item->GetPath().c_str());
+			}
+			ImGui::PopID();
+			if (bSelected)
+				ImGui::SetItemDefaultFocus();
+		}
+		ImGui::EndCombo();
+	}
+
 	bool DrawSequenceSlot(UObject* Owner, ULevelSequence** SequencePtr)
 	{
 		ULevelSequence* Current = *SequencePtr;
@@ -552,7 +615,15 @@ namespace
 			{
 				if (ImGui::BeginTable("MaterialProperties", 2))
 				{
-					ImGui::TableSetupColumn("Label", ImGuiTableColumnFlags_WidthFixed, 110.0f);
+					// 라벨 칸은 고정값 대신 가장 긴 라벨 길이로 정한다 (폰트가 바뀌어도 잘리지 않게)
+					float LabelColumnWidth = 0.0f;
+					for (const char* Label : { "Texture", "NormalTexture", "Flip Green", "Base Color", "UV Scroll",
+											   "Shininess", "Specular Color", "Sampler", "Blend Mode" })
+					{
+						LabelColumnWidth = std::max(LabelColumnWidth, ImGui::CalcTextSize(Label).x);
+					}
+					LabelColumnWidth += ImGui::GetStyle().ItemSpacing.x * 2.0f;
+					ImGui::TableSetupColumn("Label", ImGuiTableColumnFlags_WidthFixed, LabelColumnWidth);
 					ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
 
 					ImGui::TableNextRow();
@@ -1219,6 +1290,10 @@ namespace
 			{
 				DrawMeshSlot(Object, reinterpret_cast<UStaticMesh**>(ObjPtr));
 			}
+			else if (Property.Class == USkeletalMesh::StaticClass())
+			{
+				DrawSkeletalMeshSlot(Object, reinterpret_cast<USkeletalMesh**>(ObjPtr));
+			}
 			else if (Property.Class == ULevelSequence::StaticClass())
 			{
 				bChanged = DrawSequenceSlot(Object, reinterpret_cast<ULevelSequence**>(ObjPtr));
@@ -1346,6 +1421,12 @@ namespace
 			if (ImGui::MenuItem("StaticMesh Component"))
 			{
 				OutSelectedComponent = Actor->AddComponent(UStaticMeshComponent::StaticClass(), FString(ComponentNameInputBuf));
+				ComponentNameInputBuf[0] = '\0';
+				ImGui::CloseCurrentPopup();
+			}
+			if (ImGui::MenuItem("SkeletalMesh Component"))
+			{
+				OutSelectedComponent = Actor->AddComponent(USkeletalMeshComponent::StaticClass(), FString(ComponentNameInputBuf));
 				ComponentNameInputBuf[0] = '\0';
 				ImGui::CloseCurrentPopup();
 			}

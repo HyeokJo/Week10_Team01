@@ -200,6 +200,11 @@ void FRenderDevice::CreateStates()
 		Desc.CullMode = D3D11_CULL_NONE;
 		Device->CreateRasterizerState(&Desc, RasterizerStates[(uint8)ERasterizerState::Wireframe].GetAddressOf());
 
+		// 선의 덮인 비율을 알파에 곱한다. AlphaBlend와 함께 써야 효과가 있다
+		Desc.FillMode = D3D11_FILL_SOLID;
+		Desc.AntialiasedLineEnable = TRUE;
+		Device->CreateRasterizerState(&Desc, RasterizerStates[(uint8)ERasterizerState::AntialiasedLine].GetAddressOf());
+
 		// 섀도우 맵 렌더 전용: Shadow Pancaking (DepthClipEnable = FALSE) 및 하드웨어 Slope-Scaled Depth Bias 적용
 		D3D11_RASTERIZER_DESC ShadowDesc = {};
 		ShadowDesc.FillMode = D3D11_FILL_SOLID;

@@ -21,7 +21,7 @@ public:
 	// 메시가 바뀌면 슬롯 구성이 달라지므로 덮어쓰기를 비운다
 	void SetStaticMesh(UStaticMesh* InStaticMesh);
 	UStaticMesh* GetStaticMesh() const { return StaticMesh; }
-	virtual UStaticMesh* GetRenderMesh() const override { return StaticMesh; }
+	virtual FMeshRenderResource* GetRenderResource() const override { return StaticMesh; }
 
 	virtual int32 GetNumMaterials() const override;
 	virtual FString GetMaterialSlotName(int32 SlotIndex) const override;

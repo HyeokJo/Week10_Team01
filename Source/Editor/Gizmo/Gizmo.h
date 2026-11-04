@@ -55,6 +55,8 @@ public:
 
 	bool IsUsing() const { return DraggingAxis >= 0; }
 	int GetHoveredAxis() const { return HoveredAxis; }
+	// 커서가 View를 벗어나 Update를 부르지 않을 때 축 강조를 끈다
+	void ClearHover() { HoveredAxis = -1; }
 
 	int PickAxis(const FVector2& MousePos, const FMatrix& ViewProj, int ScreenW, int ScreenH);
 

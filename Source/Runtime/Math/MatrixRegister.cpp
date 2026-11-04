@@ -111,11 +111,6 @@ FMatrixRegister FMatrixRegister::Inverse() const
 
 	// cofactors
 
-	FVectorRegister C0;
-	FVectorRegister C1;
-	FVectorRegister C2;
-	FVectorRegister C3;
-
 	float C10 =-Determinant3x3(VectorSIMD::Swizzle<1, 2, 3, 3>(A), VectorSIMD::Swizzle<1, 2, 3, 3>(C), VectorSIMD::Swizzle<1, 2, 3, 3>(D));
 	float C11 = Determinant3x3(VectorSIMD::Shuffle<0, 2, 3, 3>(A, A), VectorSIMD::Shuffle<0, 2, 3, 3>(C, C), VectorSIMD::Shuffle<0, 2, 3, 3>(D, D));
 	float C12 = -Determinant3x3(VectorSIMD::Shuffle<0, 1, 3, 3>(A, A), VectorSIMD::Shuffle<0, 1, 3, 3>(C, C), VectorSIMD::Shuffle<0, 1, 3, 3>(D, D));

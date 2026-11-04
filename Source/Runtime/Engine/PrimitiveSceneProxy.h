@@ -5,7 +5,7 @@
 
 class FScene;
 class UPrimitiveComponent;
-class UStaticMesh;
+class FMeshRenderResource;
 class UMaterial;
 
 class FPrimitiveSceneProxy
@@ -16,6 +16,7 @@ public:
     void UpdateTransform();
     void UpdateRenderState();
     void OnMeshRenderDataChanged();
+    void OnMeshBoundsChanged();
     void OnMeshDestroyed();
 
     UPrimitiveComponent* GetComponent() const { return Component; }
@@ -25,7 +26,8 @@ public:
     // 노멀 변환용 World 역전치. Transform이 바뀔 때만 다시 계산한다.
     const FMatrix& GetNormalMatrix() const { return NormalMatrix; }
     const FLODSphere& GetLODSphere() const { return LODSphere; }
-    UStaticMesh* GetMesh() const { return Mesh; }
+    // 그릴 자원. 스태틱이면 UStaticMesh, 스켈레탈이면 컴포넌트의 FSkeletalMeshObject
+    FMeshRenderResource* GetMesh() const { return Mesh; }
     bool IsVisible() const { return bVisible; }
     bool IsCastShadow() const { return bCastShadow; }
     bool IsReceiveShadow() const { return bReceiveShadow; }
@@ -43,7 +45,7 @@ private:
     friend class FScene;
     FScene* Scene = nullptr;
     UPrimitiveComponent* Component = nullptr;
-    UStaticMesh* Mesh = nullptr;
+    FMeshRenderResource* Mesh = nullptr;
     TSharedPtr<const FMeshRenderState> RenderState;
     FMatrix LocalToWorld;
     FMatrix WorldToLocal;

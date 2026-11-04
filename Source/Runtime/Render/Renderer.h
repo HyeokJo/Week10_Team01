@@ -171,7 +171,7 @@ private:
 	bool bUsePerObjectSlots = false;
 	bool bObjectConstantsPrepared = false;
 	UMaterial* LastMaterial;
-	UStaticMesh* LastMesh;
+	const FMeshRenderResource* LastMesh;
 
 	FShaderProgram* ViewModeShaders[2][2] = {};
 

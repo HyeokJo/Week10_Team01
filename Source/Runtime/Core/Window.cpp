@@ -58,7 +58,7 @@ bool FWindow::Create(HINSTANCE hInstance, int InWidth, int InHeight, const wchar
 	DWORD style = bBorderless ? WS_POPUP : WS_OVERLAPPEDWINDOW;
 
 	// 원하는 클라이언트 크기 -> 실제 윈도우 크기로 보정 (테두리 두께도 배율을 따른다)
-	RECT rc = { 0, 0, Width, Height };
+	RECT rc = { 0, 0, static_cast<LONG>(Width), static_cast<LONG>(Height) };
 	AdjustWindowRectExForDpi(&rc, style, FALSE, 0, GetDpiForSystem());   // FALSE = 메뉴 없음
 	int WindowWidth = rc.right - rc.left;
 	int WindowHeight = rc.bottom - rc.top;
@@ -175,11 +175,11 @@ LRESULT FWindow::HandleMessage(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam
 		break;
 
 	case WM_KEYDOWN:
-		FInputSystem::OnKeyDown(wParam);
+		FInputSystem::OnKeyDown(static_cast<int>(wParam));
 		break;
 
 	case WM_KEYUP:
-		FInputSystem::OnKeyUp(wParam);
+		FInputSystem::OnKeyUp(static_cast<int>(wParam));
 		break;
 
 	// 포커스를 잃으면 이후의 KeyUp/ButtonUp 메시지가 이 창으로 오지 않으므로

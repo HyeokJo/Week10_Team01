@@ -25,7 +25,11 @@ public:
 	void SetLightColor(const FColor& InColor) { LightColor = InColor; }
 
 	float GetIntensity() const { return Intensity; }
-	void SetIntensity(float InIntensity) { Intensity = InIntensity; }
+	void SetIntensity(float InIntensity)
+	{
+		Intensity = InIntensity;
+		MarkSceneProxyDirty();   // 프록시가 세기를 복사해 들고 있다
+	}
 
 	bool IsLightVisible() const { return bVisible; }
 	void SetLightVisible(bool bInVisible) { bVisible = bInVisible; }
