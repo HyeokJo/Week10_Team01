@@ -320,7 +320,7 @@ FOcclusionMeasureResult FRenderer::MeasureOpaqueOcclusion(const FMatrix& ViewPro
 	// 불투명 드로우를 두 경로(스태틱 묶음, 일반 패킷)에서 한 목록으로 모은다. 그린 순서와 같게 묶음 먼저.
 	struct FMeasureDraw
 	{
-		UStaticMesh* Mesh;
+		FMeshRenderResource* Mesh;
 		UMaterial* Material;
 		uint8 LODIndex;
 		uint32 Slot;
@@ -381,7 +381,7 @@ FOcclusionMeasureResult FRenderer::MeasureOpaqueOcclusion(const FMatrix& ViewPro
 	if (!bUsePerObjectSlots)
 		RenderCommand::BindConstantBuffer(2, PerObjectCB.get(), EShaderBindFlagBits::Vertex);
 
-	UStaticMesh* BoundMesh = nullptr;
+	const FMeshRenderResource* BoundMesh = nullptr;
 	UMaterial* BoundMaterial = nullptr;
 	uint8 BoundLOD = 0;
 

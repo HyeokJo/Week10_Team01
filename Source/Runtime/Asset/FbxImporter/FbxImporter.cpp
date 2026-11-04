@@ -249,8 +249,138 @@ namespace
 		return LocalToGlobal;
 	}
 
+	// 노드에서 위로 올라가며 처음 만나는 뼈. 없으면 -1
+	int32 FindParentBone(FbxNode* Node, const TMap<FbxNode*, int32>& NodeToBone)
+	{
+		for (FbxNode* Current = Node; Current != nullptr; Current = Current->GetParent())
+		{
+			if (const int32* Found = NodeToBone.Find(Current))
+			{
+				return *Found;
+			}
+		}
+		return -1;
+	}
+
+	// Cluster는 "뼈 -> (ControlPoint, 가중치) 목록"이다. 이것을 "ControlPoint -> (뼈, 가중치) 목록"으로 뒤집는다.
+	// OutMeshBind : 바인드 순간 메시 노드의 Global (Cluster::GetTransformMatrix). 정점을 바인드 포즈에 놓을 때 쓴다
+	bool ExtractSkinWeights(FbxNode* Node, FbxMesh* Mesh, const TMap<FbxNode*, int32>& NodeToBone,
+							FFbxMeshInfo& Out, FbxAMatrix& OutMeshBind)
+	{
+		const int ControlPointCount = Mesh->GetControlPointsCount();
+		const int SkinCount = Mesh->GetDeformerCount(FbxDeformer::eSkin);
+		if (SkinCount == 0) return false;
+
+		Out.ControlPointInfluences.SetNum(ControlPointCount);
+
+		bool bMeshBindFound = false;
+		for (int s = 0; s < SkinCount; s++)
+		{
+			FbxSkin* Skin = static_cast<FbxSkin*>(Mesh->GetDeformer(s, FbxDeformer::eSkin));
+
+			for (int c = 0; c < Skin->GetClusterCount(); c++)
+			{
+				FbxCluster* Cluster = Skin->GetCluster(c);
+				FbxNode* Link = Cluster->GetLink();
+				if (Link == nullptr) continue;
+
+				const int32* BoneIndex = NodeToBone.Find(Link);
+				if (BoneIndex == nullptr) continue;   // CollectClusterLinks가 Link를 전부 뼈로 넣었으니 오지 않는다
+
+				//Additive인 link는 대응하지 않고 경고만 띄운다
+				if (Cluster->GetLinkMode() == FbxCluster::eAdditive)
+				{
+					HTR_LOG(Warning, "[FBX] {}: cluster \"{}\" is additive, treated as normalize", Out.Name, Link->GetName());
+				}
+
+				// 한 Skin의 Cluster는 보통 같은 TransformMatrix를 가진다. 첫 값을 쓴다
+				if (!bMeshBindFound)
+				{
+					Cluster->GetTransformMatrix(OutMeshBind);
+					bMeshBindFound = true;
+				}
+
+				//클러스터가 영향을 주는 ControlPoint의 개수
+				const int Count = Cluster->GetControlPointIndicesCount();
+				const int* Indices = Cluster->GetControlPointIndices();
+				const double* Weights = Cluster->GetControlPointWeights();
+				for (int i = 0; i < Count; i++)
+				{
+					const int ControlPoint = Indices[i];
+					const float Weight = static_cast<float>(Weights[i]);
+					if (ControlPoint < 0 || ControlPoint >= ControlPointCount || Weight <= 0.0f) continue;
+
+					Out.ControlPointInfluences[ControlPoint].Add({ *BoneIndex, Weight });
+				}
+			}
+		}
+
+		// 가중치가 하나도 없는 ControlPoint는 메시의 부모 뼈(없으면 0번)에 붙인다. 안 그러면 원점으로 빨려 들어간다
+		// 정상적이라면 이게 없어야 한다. 경고가 뜬다면 리깅쪽 문제가 있다는 것이니 작업자에게 알려야 한다.
+		const int32 FallbackBone = std::max(FindParentBone(Node, NodeToBone), 0);
+		int32 Unweighted = 0;
+		for (TArray<FFbxSkinInfluence>& List : Out.ControlPointInfluences)
+		{
+			if (List.IsEmpty())
+			{
+				List.Add({ FallbackBone, 1.0f });
+				Unweighted++;
+			}
+		}
+		if (Unweighted > 0)
+		{
+			HTR_LOG(Warning, "[FBX] {}: {} control points have no weight, bound to bone {}", Out.Name, Unweighted, FallbackBone);
+		}
+
+		Out.bHasSkin = bMeshBindFound;
+		return bMeshBindFound;
+	}
+
+	// 스킨이 없는 메시(뼈에 붙은 무기, 헬멧 등)는 부모 뼈 하나를 가중치 1로 따라가게 한다
+	void AttachToParentBone(FbxNode* Node, const TMap<FbxNode*, int32>& NodeToBone, FFbxMeshInfo& Out)
+	{
+		const int32 Bone = std::max(FindParentBone(Node, NodeToBone), 0);
+		Out.ControlPointInfluences.SetNum(Out.ControlPoints.Num());
+		for (TArray<FFbxSkinInfluence>& List : Out.ControlPointInfluences)
+		{
+			List.Add({ Bone, 1.0f });
+		}
+		HTR_LOG(Info, "[FBX] {}: no skin, attached to bone {}", Out.Name, Bone);
+	}
+
+	// 바인드 공간 -> 씬 공간 보정 행렬. Correction * MeshBind == MeshGlobal
+	// Cluster의 행렬은 씬과 다른 공간일 수 있다. 예: 3ds Max에서 온 파일은 씬이 Y-up인데 바인드 행렬은 Z-up으로 남아 있고,
+	// 그 차이를 MaxToFilmbox_Root 같은 루트 노드의 회전이 메운다. 첫 스킨 메시로 차이를 구해 메시와 뼈에 똑같이 곱한다.
+	// 일반 파일은 단위 행렬에 가깝고, 메시와 뼈의 상대 위치는 바뀌지 않는다
+	FbxAMatrix ComputeBindCorrection(const TArray<FbxNode*>& MeshNodes)
+	{
+		for (FbxNode* Node : MeshNodes)
+		{
+			FbxMesh* Mesh = Node->GetMesh();
+			if (Mesh == nullptr) continue;
+
+			const int SkinCount = Mesh->GetDeformerCount(FbxDeformer::eSkin);
+			for (int s = 0; s < SkinCount; s++)
+			{
+				FbxSkin* Skin = static_cast<FbxSkin*>(Mesh->GetDeformer(s, FbxDeformer::eSkin));
+				for (int c = 0; c < Skin->GetClusterCount(); c++)
+				{
+					FbxCluster* Cluster = Skin->GetCluster(c);
+					if (Cluster->GetLink() == nullptr) continue;
+
+					FbxAMatrix MeshBind;
+					Cluster->GetTransformMatrix(MeshBind);
+					return Node->EvaluateGlobalTransform() * MeshBind.Inverse();
+				}
+			}
+		}
+		return FbxAMatrix();   // 단위 행렬
+	}
+
 	//메시
-	bool ExtractMesh(FbxNode* Node, const TArray<int32>& LocalToGlobal, const FFbxImportOptions& Option, FFbxMeshInfo& Out)
+	// NodeToBone이 비어 있지 않으면(스켈레탈) 스킨 가중치까지 읽는다
+	bool ExtractMesh(FbxNode* Node, const TArray<int32>& LocalToGlobal, const FFbxImportOptions& Option,
+					 const TMap<FbxNode*, int32>& NodeToBone, const FbxAMatrix& BindCorrection, FFbxMeshInfo& Out)
 	{
 		//ExtractMesh에서 머티리얼 요소가 없거나 로컬 번호가 범위 밖이면 GlobalSlot = -1을 넣는다.
 
@@ -261,9 +391,21 @@ namespace
 		FbxMesh* Mesh = Node->GetMesh();
 		if (Mesh == nullptr) return false;
 
+		const bool bSkeletal = !NodeToBone.IsEmpty();
 
 		// 노드 행렬 : Global(Pre-Rotation, 축/단위 변환 포함) * Geometric(이 노드의 메시에만)
-		const FbxAMatrix Global = Node->EvaluateGlobalTransform();
+		// 스킨 메시는 지금(0프레임) 위치가 아니라 바인드 순간의 Global을 쓴다.
+		// 뼈의 바인드 행렬(TransformLinkMatrix)과 같은 순간이어야 스킨 행렬이 바인드 포즈에서 단위 행렬이 된다.
+		// 뼈와 똑같이 BindCorrection을 곱해 씬 공간으로 옮긴다
+		FbxAMatrix Global = Node->EvaluateGlobalTransform();
+		if (bSkeletal)
+		{
+			FbxAMatrix MeshBind;
+			if (ExtractSkinWeights(Node, Mesh, NodeToBone, Out, MeshBind))
+			{
+				Global = BindCorrection * MeshBind;
+			}
+		}
 
 		const FbxAMatrix Geometric(
 			Node->GetGeometricTranslation(FbxNode::eSourcePivot),
@@ -298,6 +440,11 @@ namespace
 			// 로그상 ControlPoint의 w가 0이다. MultT가 이동까지 반영하는지 box.fbx로 꼭 한 번 확인할 것.
 			const FbxVector4 P = M.MultT(ControlPoints[i]);
 			Out.ControlPoints.Add(FVector(static_cast<float>(P[0]), static_cast<float>(P[1]), static_cast<float>(P[2])));
+		}
+
+		if (bSkeletal && !Out.bHasSkin)
+		{
+			AttachToParentBone(Node, NodeToBone, Out);
 		}
 
 		// 레이어 준비
@@ -386,13 +533,280 @@ namespace
 		return true;
 	}
 
+	// FbxAMatrix*FbxMatrix -> FMatrix. 둘 다 [행][열] 배치에 이동이 3행에 있어서 값은 그대로 복사한다.
+	// 의미는 같지만 곱셈 표기가 반대다: FBX의 A * B (열 벡터, B 먼저) == 엔진의 B * A (행 벡터, B 먼저)
+	template <typename TFbxMatrix>
+	FMatrix ToFMatrix(const TFbxMatrix& In)
+	{
+		FMatrix Out;
+		for (int Row = 0; Row < 4; Row++)
+		{
+			for (int Col = 0; Col < 4; Col++)
+			{
+				Out.M[Row][Col] = static_cast<float>(In.Get(Row, Col));
+			}
+		}
+		return Out;
+	}
+
+	// CollectMeshNodes와 같은 모양.
+	void CollectSkeletonNodes(FbxNode* Node, TSet<FbxNode*>& OutNodes)
+	{
+		if (Node == nullptr) return;
+
+		FbxNodeAttribute* Attribute = Node->GetNodeAttribute();
+		if (Attribute && Attribute->GetAttributeType() == FbxNodeAttribute::eSkeleton)
+		{
+			OutNodes.Add(Node);
+		}
+
+		for (int i = 0; i < Node->GetChildCount(); i++)
+		{
+			CollectSkeletonNodes(Node->GetChild(i), OutNodes);
+		}
+	}
+
+	// Link는 eSkeleton이 아닐 수 있어서 여기서 집합에 추가한다.
+	void CollectClusterLinks(const TArray<FbxNode*>& MeshNodes, TSet<FbxNode*>& OutNodes,
+							 TMap<FbxNode*, FbxAMatrix>& OutLinkBind)
+	{
+		for (FbxNode* MeshNode : MeshNodes)
+		{
+			FbxMesh* Mesh = MeshNode->GetMesh();
+			if (Mesh == nullptr) continue;
+
+			const int SkinCount = Mesh->GetDeformerCount(FbxDeformer::eSkin);
+			for (int s = 0; s < SkinCount; s++)
+			{
+				FbxSkin* Skin = static_cast<FbxSkin*>(Mesh->GetDeformer(s, FbxDeformer::eSkin));
+
+				for (int c = 0; c < Skin->GetClusterCount(); c++)
+				{
+					FbxCluster* Cluster = Skin->GetCluster(c);
+					FbxNode* Link = Cluster->GetLink();
+					if (Link == nullptr) continue;   // 끊어진 클러스터
+
+					//Link를 eSkeleton 배열에 추가한다
+					//Link 노드가 eNull, eMesh와 같은 걸 가르키게 된다면 앞서 eSkeleton만 구한것으로는 NodeToBone에 포함 못시킨다.
+					// 이미 추가된 노드여도 TSet이라 한번만 들어간다.
+					OutNodes.Add(Link);
+
+					// 여러 메시(Body, Helmet)가 같은 뼈를 가리키면 처음 것만 쓴다. 보통 값이 같다
+					if (OutLinkBind.Find(Link) == nullptr)
+					{
+						//GetTransformLinkMatrix
+						//		바인드 순간 Link 노드의 Global
+						//GetTransformMatrix
+						//		바인드 순간 메시 노드의 Global
+						//GetTransformAssociateModelMatrix
+						//		Additive 모드에서만 쓰는 기준 모델의 행렬
+						FbxAMatrix LinkBind;
+
+						//바인드 순간의 Link 노드의 Global을 저장한다.
+						Cluster->GetTransformLinkMatrix(LinkBind);
+						OutLinkBind.Add(Link, LinkBind);
+					}
+				}
+			}
+		}
+	}
+
+	// FbxPose는 "노드 + 행렬" 목록이다
+	//Bind Pose	
+	//	스킨을 입힌 순간 노드들의 Global 행렬
+	//Rest Pose	
+	//	사용자가 저장해 둔 아무 자세. Maya에서 dagPose -save로 저장한 포즈, 캐릭터 기본 스탠스 등. Local일 수도 있다.
+	void CollectBindPose(FbxScene* Scene, TMap<FbxNode*, FbxMatrix>& OutPose)
+	{
+		for (int i = 0; i < Scene->GetPoseCount(); i++)
+		{
+			FbxPose* Pose = Scene->GetPose(i);
+			if (Pose == nullptr || !Pose->IsBindPose()) continue;
+
+			for (int n = 0; n < Pose->GetCount(); n++)
+			{
+				if (Pose->IsLocalMatrix(n)) continue;   // 바인드 포즈는 보통 Global. Local이면 쓰지 않는다
+
+				FbxNode* Node = Pose->GetNode(n);
+				if (Node && OutPose.Find(Node) == nullptr)
+				{
+					// FbxMatrix (FbxAMatrix 아님)
+					//FbxAMatrix
+					//	Affine 행렬(이동 회전 스케일)
+					//FbxMatrix
+					//	일반 4x4 행렬
+					//부모의 비균일 스케일 때문에 shear가 생긴 행렬도 있을 수 있어서, 무엇이든 담을 수 있는 일반 행렬을 쓴다.
+					OutPose.Add(Node, Pose->GetMatrix(n));
+				}
+			}
+		}
+	}
+
+	// 뼈가 아닌 노드는 ParentBone을 그대로 넘겨서 건너뛴다
+	void BuildBoneOrder(FbxNode* Node, int32 ParentBone, const TSet<FbxNode*>& BoneNodes,
+						TArray<FbxNode*>& OutOrder, TArray<int32>& OutParents, TMap<FbxNode*, int32>& OutNodeToBone)
+	{
+		if (Node == nullptr) return;
+
+		int32 ThisBone = ParentBone;
+		if (BoneNodes.Contains(Node))
+		{
+			ThisBone = OutOrder.Num();
+			OutOrder.Add(Node);
+			OutParents.Add(ParentBone);
+			OutNodeToBone.Add(Node, ThisBone);
+		}
+
+		for (int i = 0; i < Node->GetChildCount(); i++)
+		{
+			BuildBoneOrder(Node->GetChild(i), ThisBone, BoneNodes, OutOrder, OutParents, OutNodeToBone);
+		}
+	}
+
+	bool ExtractSkeleton(FbxScene* Scene, const TArray<FbxNode*>& MeshNodes, const FFbxImportOptions& Option,
+						 const FbxAMatrix& BindCorrection, FFbxInfo& Out, TMap<FbxNode*, int32>& OutNodeToBone)
+	{
+		//eSkeleton 노드 모으기
+		TSet<FbxNode*> BoneNodes;
+		CollectSkeletonNodes(Scene->GetRootNode(), BoneNodes);
+
+		//eSkeleton이 아닌 Link 노드를 BoneNodes에 포함, Link 노드의 Global 구하기.
+		TMap<FbxNode*, FbxAMatrix> LinkBind;
+		CollectClusterLinks(MeshNodes, BoneNodes, LinkBind);
+
+		if (BoneNodes.IsEmpty())
+		{
+			HTR_LOG(Warning, "[FBX] {}: no bone", Out.Path);
+			return false;
+		}
+
+		//모든 노드 중 바인드 포즈, Global인 행렬만 저장한다.
+		//LinkBind는 Link에서 얻었기에 가중치에 영향을 주는 뼈만 Global을 구했다
+		//PoseBind는 모든 포즈에서 구했기에 가중치 없는 뼈 등도 다 Global을 구했다.
+		//우선순위는 Cluster -> BindPose -> Evaluate로 한다.
+		//	Cluster
+		//		정점 변형을 정의하는 값이라 가장 믿을만 하다
+		//	BindPose
+		//		Cluster가 없는 뼈의 바인드 값을 채우는 용도
+		//	Evaluate
+		//		둘 다 없을 때 0프레임의 부모 기준 값을 부모의 바인드로 붙이도록 한다.
+		TMap<FbxNode*, FbxMatrix> PoseBind;
+		CollectBindPose(Scene, PoseBind);
+
+		// 본 순서, 부모, NodeToBone 채우기
+		TArray<FbxNode*> Order;
+		TArray<int32> Parents;
+		BuildBoneOrder(Scene->GetRootNode(), -1, BoneNodes, Order, Parents, OutNodeToBone);
+
+		// 메시의 Import Uniform Scale과 같은 값 (ExtractMesh의 Scale * M == 엔진 표기 M * Scale)
+		FMatrix UniformScale = FMatrix::Identity;
+		UniformScale.M[0][0] = UniformScale.M[1][1] = UniformScale.M[2][2] = Option.ImportUniformScale;
+
+		int32 FromCluster = 0;
+		int32 FromPose = 0;
+		int32 FromEvaluate = 0;
+		Out.Bones.Reserve(Order.Num());
+
+		for (int32 i = 0; i < Order.Num(); i++)
+		{
+			FbxNode* Node = Order[i];
+
+			FFbxBoneInfo Bone;
+			Bone.Name = Node->GetName();
+			Bone.ParentIndex = Parents[i];
+
+			// 바인드 Global: Cluster -> BindPose -> Evaluate
+			// Cluster·BindPose는 바인드 공간 값이라 씬 공간으로 옮긴다. FBX: Correction * Bind == 엔진: Bind × Correction
+			if (const FbxAMatrix* Found = LinkBind.Find(Node))
+			{
+				const FbxAMatrix SceneBind = BindCorrection * (*Found);
+				Bone.GlobalBindPose = ToFMatrix(SceneBind);
+				Bone.bFromCluster = true;
+				FromCluster++;
+
+				// 진단: 바인드(Cluster)와 레퍼런스(Evaluate)의 위치 차이. T-포즈 파일이면 0에 가깝다
+				const FbxVector4 Diff = SceneBind.GetT() - Node->EvaluateGlobalTransform().GetT();
+				if (Diff.Length() > 1e-3)
+				{
+					HTR_LOG(Warning, "[FBX] bone \"{}\": bind vs reference differ by {:.4f}", Bone.Name, Diff.Length());
+				}
+			}
+			//Cluster에서 못 찾았으면 = 가중치가 없는 뼈였다. 바인드 포즈에서 찾는다.
+			else if (const FbxMatrix* FoundPose = PoseBind.Find(Node))
+			{
+				Bone.GlobalBindPose = ToFMatrix(*FoundPose) * ToFMatrix(BindCorrection);
+				FromPose++;
+			}
+			else if (Bone.ParentIndex >= 0)
+			{
+				// 가중치 없는 끝 뼈 등. 0프레임 Global을 그대로 쓰면, 0프레임이 바인드 포즈와 다른 파일에서
+				// 부모(바인드)와 어긋난다. 0프레임의 "부모 기준" 값만 가져와 부모의 바인드 Global에 붙인다.
+				// FBX: Global = ParentGlobal * Local  ==  엔진: Local × ParentGlobal
+				// 부모 값에 UniformScale이 이미 들어 있으므로 아래 스케일을 다시 곱하지 않는다
+				// (부모 뼈와 사이에 뼈 아닌 노드가 끼어 있을 수 있어 EvaluateLocalTransform 대신 두 Global로 구한다)
+				const FbxAMatrix LocalToParentBone =
+					Order[Bone.ParentIndex]->EvaluateGlobalTransform().Inverse() * Node->EvaluateGlobalTransform();
+				Bone.GlobalBindPose = ToFMatrix(LocalToParentBone) * Out.Bones[Bone.ParentIndex].GlobalBindPose;
+				FromEvaluate++;
+				Out.Bones.Add(Bone);
+				continue;
+			}
+			else
+			{
+				Bone.GlobalBindPose = ToFMatrix(Node->EvaluateGlobalTransform());
+				FromEvaluate++;
+			}
+
+			//스케일 키우기
+			if (Option.ImportUniformScale != 1.0f)
+			{
+				Bone.GlobalBindPose = Bone.GlobalBindPose * UniformScale;
+			}
+
+			Out.Bones.Add(Bone);
+		}
+
+		HTR_LOG(Info, "[FBX] {}: bones {} (cluster {}, bindpose {}, evaluate {})",
+				Out.Path, Out.Bones.Num(), FromCluster, FromPose, FromEvaluate);
+
+		// 이름, 부모 확인용. 많으면 나중에 지운다
+		for (int32 i = 0; i < Out.Bones.Num(); i++)
+		{
+			const FFbxBoneInfo& Bone = Out.Bones[i];
+			const FMatrix& G = Bone.GlobalBindPose;
+			HTR_LOG(Info, "[FBX]   [{}] {} parent {} pos ({:.3f}, {:.3f}, {:.3f}){}", i, Bone.Name, Bone.ParentIndex,
+					G.M[3][0], G.M[3][1], G.M[3][2], Bone.bFromCluster ? "" : " *");
+		}
+		return true;
+	}
+
 
 	//----------------Cook------------------
 
-	// PrepareScene에서 Y-up 오른손으로 맞췄으니 OBJ와 같은 변환을 쓴다 (엔진: X 앞, Y 오른쪽, Z 위, 왼손)
-	FVector ToEngine(const FVector& V)
+	// PrepareScene에서 Y-up 오른손으로 맞췄다. FBX 캐릭터는 보통 +Z를 보고 왼쪽이 +X다 (엔진: X 앞, Y 오른쪽, Z 위, 왼손)
+	// bForceFrontXAxis  true: 정면 +Z -> +X,  false: 정면 +Z -> +Y (언리얼과 같음). 둘 다 왼손으로 바뀌니 감기 처리는 같다
+	FVector ToEngine(const FVector& V, bool bForceFrontXAxis)
 	{
-		return FVector(-V.Z, V.X, V.Y);
+		return bForceFrontXAxis ? FVector(V.Z, -V.X, V.Y) : FVector(V.X, V.Z, V.Y);
+	}
+
+	// ToEngine의 행렬 버전. 정점과 뼈가 같은 변환을 받아야 겹친다
+	// 행 벡터: p_e = p_f × C 이므로 M_e = Cᵀ × M_f × C
+	FMatrix ToEngineMatrix(const FMatrix& FbxSpace, bool bForceFrontXAxis)
+	{
+		static const FMatrix FrontX(
+			0.f, -1.f, 0.f, 0.f,
+			0.f, 0.f, 1.f, 0.f,
+			1.f, 0.f, 0.f, 0.f,
+			0.f, 0.f, 0.f, 1.f);
+		static const FMatrix FrontY(
+			1.f, 0.f, 0.f, 0.f,
+			0.f, 0.f, 1.f, 0.f,
+			0.f, 1.f, 0.f, 0.f,
+			0.f, 0.f, 0.f, 1.f);
+		const FMatrix& C = bForceFrontXAxis ? FrontX : FrontY;
+
+		return C.GetTransposed() * FbxSpace * C;
 	}
 
 	// 값이 전부 같아야 GPU 정점 하나를 같이 쓴다. 메시 번호를 넣어 서로 다른 메시의 정점이 섞이지 않게 한다.
@@ -489,10 +903,13 @@ TUniquePtr<FStaticMeshData> FFbxImporter::LoadStaticMeshData(const FString& Path
 	//	return Baked;
 	//}
 
+	FFbxImportOptions StaticOption = Option;
+	StaticOption.bImportSkeletalMesh = false;   // 스태틱은 뼈·가중치를 읽지 않는다
+
 	FFbxInfo Info;
 	TUniquePtr<FStaticMeshData> Data = MakeUnique<FStaticMeshData>();
 
-	if (!ParseFbx(Path, Option, Info) || !CookStaticMesh(Info, *Data))
+	if (!ParseFbx(Path, StaticOption, Info) || !CookStaticMesh(Info, *Data))
 	{
 		return nullptr;
 	}
@@ -501,9 +918,20 @@ TUniquePtr<FStaticMeshData> FFbxImporter::LoadStaticMeshData(const FString& Path
 	return Data;
 }
 
-TUniquePtr<FSkeletalMeshData> FFbxImporter::LoadSkeletalMeshData(const FString& Path)
+TUniquePtr<FSkeletalMeshData> FFbxImporter::LoadSkeletalMeshData(const FString& Path, const FFbxImportOptions& Option)
 {
-	return TUniquePtr<FSkeletalMeshData>();
+	FFbxImportOptions SkeletalOption = Option;
+	//SkeletalOption.bImportSkeletalMesh = true;   // ExtractScene이 뼈를 읽도록
+
+	FFbxInfo Info;
+	TUniquePtr<FSkeletalMeshData> Data = MakeUnique<FSkeletalMeshData>();
+
+	if (!ParseFbx(Path, SkeletalOption, Info) || !CookSkeletalMesh(Info, *Data))
+	{
+		return nullptr;
+	}
+
+	return Data;
 }
 
 bool FFbxImporter::CreateManager(fbxsdk::FbxManager*& InManager)
@@ -714,12 +1142,42 @@ bool FFbxImporter::ParseFbx(const FString& Path, const FFbxImportOptions& Option
 	return Result;
 }
 
-bool FFbxImporter::CookSkeletalMesh(const FFbxInfo& Raw, FSkeletalMeshData& Out)
+bool FFbxImporter::CookSkeleton(const FFbxInfo& Raw, FReferenceSkeleton& Out)
 {
-	return false;
+	Out.Bones.Reserve(Raw.Bones.Num());
+
+	for (int32 i = 0; i < Raw.Bones.Num(); i++)
+	{
+		const FFbxBoneInfo& RawBone = Raw.Bones[i];
+
+		FBoneInfo Bone;
+		Bone.Name = RawBone.Name;
+		Bone.ParentIndex = RawBone.ParentIndex;
+		Bone.GlobalBindPose = ToEngineMatrix(RawBone.GlobalBindPose, Raw.bForceFrontXAxis);
+		Bone.InverseBindPose = Bone.GlobalBindPose.Inverse();
+
+		// SceneComponent와 같은 식: Global = Local * ParentGlobal  ->  Local = Global * ParentGlobal^{-1}
+		// 부모는 항상 앞 번호라 이미 Out.Bones에 들어가 있다
+		Bone.LocalBindPose = Bone.ParentIndex < 0
+			? Bone.GlobalBindPose
+			: Bone.GlobalBindPose * Out.Bones[Bone.ParentIndex].InverseBindPose;
+
+		if (Out.NameToIndex.Find(Bone.Name))
+		{
+			HTR_LOG(Warning, "[FBX] {}: duplicate bone name \"{}\"", Raw.Path, Bone.Name);
+		}
+		else
+		{
+			Out.NameToIndex.Add(Bone.Name, i);
+		}
+
+		Out.Bones.Add(Bone);
+	}
+
+	return !Out.Bones.IsEmpty();
 }
 
-bool FFbxImporter::CookStaticMesh(const FFbxInfo& Raw, FStaticMeshData& Out)
+bool FFbxImporter::CookStaticMesh(const FFbxInfo& Raw, FStaticMeshData& Out, TArray<FFbxVertexSource>* OutSources)
 {
 	//ToEngine 축변환, 감기 순서 뒤집기, UV V 뒤집기, 중복 정점 제거, 섹션 만들기, 탄젠트, AABB, Validate
 	//CookStaticMesh에서 TriangleMaterials에 - 1이 하나라도 있으면 Default 슬롯을 하나 추가하고(Name = "Default", 흰색),
@@ -740,19 +1198,30 @@ bool FFbxImporter::CookStaticMesh(const FFbxInfo& Raw, FStaticMeshData& Out)
 		Slot.NormalTexturePath = RawMaterial.NormalTexture;
 		Cooked.MaterialSlots.Add(std::move(Slot));
 	}
-	if (Cooked.MaterialSlots.IsEmpty())
-	{
-		FStaticMaterialSlot DefaultSlot;
-		DefaultSlot.Name = "Default";
-		Cooked.MaterialSlots.Add(DefaultSlot);
-	}
-	const int32 SlotCount = Cooked.MaterialSlots.Num();
-
 	// 정점(중복 제거) + 슬롯별 인덱스
 	TArray<TArray<uint32>> SlotIndices;
-	SlotIndices.SetNum(SlotCount);
+	SlotIndices.SetNum(Cooked.MaterialSlots.Num());
+
+	// -1(머티리얼 없음)이나 범위 밖 번호를 쓰는 삼각형이 처음 나올 때 Default 슬롯을 "한 번만" 추가한다.
+	// (루프 밖에 있어야 한다. 안에 두면 삼각형마다 슬롯이 하나씩 늘어난다)
+	int32 DefaultSlot = -1;
+	auto GetDefaultSlot = [&]()
+		{
+			if (DefaultSlot < 0)
+			{
+				FStaticMaterialSlot Slot;
+				Slot.Name = "Default";
+				DefaultSlot = static_cast<int32>(Cooked.MaterialSlots.Add(Slot));   // Add는 새 인덱스를 돌려준다
+				(void)SlotIndices.AddDefaulted_GetRef();                             // 버킷도 같이 늘림
+			}
+			return DefaultSlot;
+		};
 
 	TMap<FFbxVertexKey, uint32, FFbxVertexKeyHash> Cache;
+	if (OutSources)
+	{
+		OutSources->Reset();
+	}
 
 	for (int32 MeshIndex = 0; MeshIndex < Raw.Meshes.Num(); MeshIndex++)
 	{
@@ -792,32 +1261,21 @@ bool FFbxImporter::CookStaticMesh(const FFbxInfo& Raw, FStaticMeshData& Out)
 				}
 
 				FVertexPNCT Vertex;
-				Vertex.Position = ToEngine(Mesh.ControlPoints[Corner.ControlPointIndex]);
-				Vertex.Normal = ToEngine(Key.Normal);
+				Vertex.Position = ToEngine(Mesh.ControlPoints[Corner.ControlPointIndex], Raw.bForceFrontXAxis);
+				Vertex.Normal = ToEngine(Key.Normal, Raw.bForceFrontXAxis);
 				Vertex.UV = FVector2(Corner.UV.X, 1.0f - Corner.UV.Y);   // FBX는 아래가 원점, DX는 위가 원점
 				Vertex.Color = Corner.Color;
 
 				const uint32 NewIndex = static_cast<uint32>(Cooked.Vertices.Num());
 				Cache.Add(Key, NewIndex);
 				Cooked.Vertices.Add(Vertex);
+				if (OutSources)
+				{
+					OutSources->Add({ MeshIndex, Corner.ControlPointIndex });   // Vertices와 같은 순서
+				}
 				Indices[c] = NewIndex;
 			}
 
-			// 슬롯을 만든 뒤: -1(머티리얼 없음)을 쓰는 삼각형이 있으면 Default 슬롯을 하나 추가
-			int32 DefaultSlot = -1;
-			auto GetDefaultSlot = [&]()
-				{
-					if (DefaultSlot < 0)
-					{
-						FStaticMaterialSlot Slot;
-						Slot.Name = "Default";
-						DefaultSlot = Cooked.MaterialSlots.Add(Slot);   // TArray::Add가 인덱스를 돌려주는지 확인. 아니면 Num() - 1
-						SlotIndices.AddDefaulted_GetRef();                     // 버킷도 같이 늘림
-					}
-					return DefaultSlot;
-				};
-
-			// 삼각형 루프 안
 			int32 Slot = Mesh.TriangleMaterials[Tri];
 			if (Slot < 0 || Slot >= Raw.Materials.Num())
 			{
@@ -834,8 +1292,8 @@ bool FFbxImporter::CookStaticMesh(const FFbxInfo& Raw, FStaticMeshData& Out)
 		}
 	}
 
-	// 섹션 : 슬롯 순서대로 이어 붙인다 
-	for (int32 Slot = 0; Slot < SlotCount; Slot++)
+	// 섹션 : 슬롯 순서대로 이어 붙인다. Default 슬롯이 나중에 붙었을 수 있으니 지금 개수로 돈다
+	for (int32 Slot = 0; Slot < SlotIndices.Num(); Slot++)
 	{
 		const TArray<uint32>& Bucket = SlotIndices[Slot];
 		if (Bucket.IsEmpty()) continue;
@@ -878,6 +1336,92 @@ bool FFbxImporter::CookStaticMesh(const FFbxInfo& Raw, FStaticMeshData& Out)
 	HTR_LOG(Info, "[FBX] {}: vertices {}, indices {}, sections {}", Raw.Path,
 			Cooked.Vertices.Num(), Cooked.Indices.Num(), Cooked.Sections.Num());
 	Out = std::move(Cooked);
+	return true;
+}
+
+bool FFbxImporter::CookSkeletalMesh(const FFbxInfo& Raw, FSkeletalMeshData& Out)
+{
+	if (!CookSkeleton(Raw, Out.Skeleton))
+	{
+		return false;
+	}
+
+	// 정점·인덱스·섹션·머티리얼은 스태틱과 똑같이 만든다. 정점마다 출처만 같이 받는다
+	FStaticMeshData Static;
+	TArray<FFbxVertexSource> Sources;
+	if (!CookStaticMesh(Raw, Static, &Sources))
+	{
+		return false;
+	}
+
+	Out.Vertices = std::move(Static.Vertices);
+	Out.Indices = std::move(Static.Indices);
+	Out.Sections = std::move(Static.Sections);
+	Out.MaterialSlots = std::move(Static.MaterialSlots);
+	Out.AABB = Static.AABB;
+
+	// 정점마다 뼈 영향: 가중치 큰 순으로 상위 4개만 남기고 합이 1이 되게 나눈다
+	//	4개인 이유는 GPU 스키닝에서 뼈 번호 4개가 uint8 * 4 = 4바이트라서 딱 맞아서 그렇다
+	//	실제 모양도 차이가 거의 없다. 대부분의 정점은 1 ~ 3개의 뼈의 영향만 받는다.
+	//		손가락 사이 같은 곳은 아니긴하다
+	//	지금 엔진은 CPU 스키닝이라 가변 개수도 처리할 수 있긴 하다
+	const int32 BoneCount = Out.Skeleton.Num();
+	Out.Influences.SetNum(Out.Vertices.Num());
+
+	int32 Truncated = 0;
+	for (int32 v = 0; v < Out.Vertices.Num(); v++)
+	{
+		const FFbxVertexSource& Source = Sources[v];
+		const FFbxMeshInfo& Mesh = Raw.Meshes[Source.MeshIndex];
+
+		TArray<FFbxSkinInfluence> List;
+		if (Source.ControlPointIndex < Mesh.ControlPointInfluences.Num())
+		{
+			List = Mesh.ControlPointInfluences[Source.ControlPointIndex];
+		}
+
+		//Weight 큰 순서로
+		std::sort(List.begin(), List.end(),
+			[](const FFbxSkinInfluence& A, const FFbxSkinInfluence& B) { return A.Weight > B.Weight; });
+
+		//영향을 준 뼈가 4개보다 많았다
+		if (List.Num() > MAX_BONE_INFLUENCES)
+		{
+			Truncated++;
+		}
+
+		FBoneInfluence& Influence = Out.Influences[v];
+		float Sum = 0.0f;
+		const int32 Count = std::min(List.Num(), MAX_BONE_INFLUENCES);
+		for (int32 i = 0; i < Count; i++)
+		{
+			Influence.BoneIndex[i] = std::clamp(List[i].BoneIndex, 0, BoneCount - 1);
+			Influence.Weight[i] = List[i].Weight;
+			Sum += List[i].Weight;
+		}
+
+		if (Sum > 0.0f)
+		{
+			for (int32 i = 0; i < Count; i++)
+			{
+				Influence.Weight[i] /= Sum;
+			}
+		}
+		else
+		{
+			// 영향이 없는 정점(ExtractMesh가 막지만 혹시 몰라서): 0번 뼈를 그대로 따라간다
+			Influence.BoneIndex[0] = 0;
+			Influence.Weight[0] = 1.0f;
+		}
+	}
+
+	if (Truncated > 0)
+	{
+		HTR_LOG(Info, "[FBX] {}: {} vertices had more than {} influences (kept top {})",
+				Raw.Path, Truncated, MAX_BONE_INFLUENCES, MAX_BONE_INFLUENCES);
+	}
+
+	HTR_LOG(Info, "[FBX] {}: skeletal mesh bones {}, vertices {}", Raw.Path, BoneCount, Out.Vertices.Num());
 	return true;
 }
 
@@ -993,6 +1537,7 @@ bool FFbxImporter::PrepareScene(fbxsdk::FbxManager* Manager, fbxsdk::FbxScene* S
 bool FFbxImporter::ExtractScene(fbxsdk::FbxScene* Scene, const FString& Path, const FFbxImportOptions& Option, FFbxInfo& Out)
 {
 	Out.Path = Path;
+	Out.bForceFrontXAxis = Option.bForceFrontXAxis;
 
 	//eMesh 노드 모으기
 	TArray<FbxNode*> MeshNodes;
@@ -1004,6 +1549,79 @@ bool FFbxImporter::ExtractScene(fbxsdk::FbxScene* Scene, const FString& Path, co
 		return false;
 	}
 
+	// 뼈는 메시 루프보다 먼저: ExtractMesh가 NodeToBone으로 Cluster -> 뼈 번호를 찾는다
+	TMap<FbxNode*, int32> NodeToBone;
+	FbxAMatrix BindCorrection;   // 스태틱은 단위 행렬 그대로
+	if (Option.bImportSkeletalMesh)
+	{
+		// 스킨이 하나도 없으면 스켈레탈이 아니다 (뼈 노드만 섞인 스태틱 파일). 호출한 쪽이 스태틱으로 다시 읽는다
+		bool bAnySkin = false;
+		for (FbxNode* Node : MeshNodes)
+		{
+			if (Node->GetMesh() && Node->GetMesh()->GetDeformerCount(FbxDeformer::eSkin) > 0)
+			{
+				bAnySkin = true;
+				break;
+			}
+		}
+		if (!bAnySkin)
+		{
+			HTR_LOG(Info, "[FBX] {}: no skin, not a skeletal mesh", Path);
+
+			//Skin이 없는데 BlendShape이 있는 경우를 조사함
+			bool bAnyBlendShape = false;
+			for (FbxNode* Node : MeshNodes)
+			{
+				if (Node->GetMesh() && Node->GetMesh()->GetDeformerCount(FbxDeformer::eBlendShape) > 0)
+				{
+					bAnyBlendShape = true;
+					break;
+				}
+			}			
+
+			//Skin이 없는데 BlendShape이 있다면 런타임에 메시 변형을 할 수 없는 StaticMesh로는 표현할 수 없다
+			//대처할 수 없다고 경고를 남긴다.
+			if (bAnyBlendShape)
+			{
+				HTR_LOG(Warning, "[FBX] {}: blend shapes ignored (morph targets not supported)", Path);
+			}
+
+			//스킨이 없는데 메시 노드의 조상 중 뼈가 있다면 뼈에 의해 움직이는 Skeletal Mesh일 수 있다.
+			//아직 그런 경우에 대해 대응하지 않고 StaticMesh로 그릴 것이기에 경고를 남긴다
+			bool bAnyParentsisBone = false;
+			for (FbxNode* Node : MeshNodes)
+			{
+				//Node의 부모를 탐색하며 Attribute가 eSkeleton인지 찾는다.
+				for (FbxNode* Current = Node->GetParent(); Current != nullptr; Current = Current->GetParent())
+				{
+					FbxNodeAttribute* Attribute = Current->GetNodeAttribute();
+					if (Attribute && Attribute->GetAttributeType() == FbxNodeAttribute::eSkeleton)
+					{
+						bAnyParentsisBone = true;
+						break;
+					}
+				}
+				//찾아버려서 빠져나가기
+				if (bAnyParentsisBone) break;
+			}
+
+			if (bAnyParentsisBone)
+			{
+				HTR_LOG(Warning, "[FBX] {}: mesh is parented to bone, but imported as static (rigid skeletal not supported)", Path);
+			}
+
+			return false;
+		}
+
+		BindCorrection = ComputeBindCorrection(MeshNodes);
+
+		if (!ExtractSkeleton(Scene, MeshNodes, Option, BindCorrection, Out, NodeToBone))
+		{
+			return false;
+		}
+	}
+
+
 	//머티리얼
 	TMap<FbxSurfaceMaterial*, int32> MaterialMap;
 	for (FbxNode* Node : MeshNodes)
@@ -1011,7 +1629,7 @@ bool FFbxImporter::ExtractScene(fbxsdk::FbxScene* Scene, const FString& Path, co
 		const TArray<int32> LocalToGlobal = ParseNodeMaterials(Node, Path, MaterialMap, Out.Materials);
 
 		FFbxMeshInfo MeshInfo;
-		if (ExtractMesh(Node, LocalToGlobal, Option, MeshInfo))
+		if (ExtractMesh(Node, LocalToGlobal, Option, NodeToBone, BindCorrection, MeshInfo))
 		{
 			HTR_LOG(Info, "[FBX] {}: mesh \"{}\" cp {}, triangles {}", Path, MeshInfo.Name,
 					MeshInfo.ControlPoints.Num(), MeshInfo.PolygonVertices.Num() / 3);

@@ -7,6 +7,9 @@
 
 struct FStaticMeshData;
 struct FSkeletalMeshData;
+struct FReferenceSkeleton;
+struct FFbxImportOptions;
+struct FFbxInfo;
 
 // FbxImporter.h
 namespace fbxsdk
@@ -24,7 +27,7 @@ public:
 	static bool DebugPrintScene(const FString& Path);
 
 	static TUniquePtr<FStaticMeshData> LoadStaticMeshData(const FString& Path, const FFbxImportOptions& Option);
-	static TUniquePtr<FSkeletalMeshData> LoadSkeletalMeshData(const FString& Path);
+	static TUniquePtr<FSkeletalMeshData> LoadSkeletalMeshData(const FString& Path, const FFbxImportOptions& Option);
 
 	static bool CreateManager(fbxsdk::FbxManager*& InManager);
 
@@ -44,8 +47,11 @@ private:
 	static bool ParseFbx(const FString& Path, const FFbxImportOptions& Option, FFbxInfo& Out);
 
 	// FFbxInfo -> FSkeletalMeshData 변환
+	static bool CookSkeleton(const FFbxInfo& Raw, FReferenceSkeleton& Out);
+	// OutSources를 넘기면 정점마다 출처(메시, ControlPoint)를 같이 채운다 (스켈레탈 Cook용)
+	static bool CookStaticMesh(const FFbxInfo& Raw, FStaticMeshData& Out, TArray<FFbxVertexSource>* OutSources = nullptr);
+	// 스켈레톤 + CookStaticMesh(정점·섹션) + 정점별 뼈 영향(상위 4개, 합 1)
 	static bool CookSkeletalMesh(const FFbxInfo& Raw, FSkeletalMeshData& Out);
-	static bool CookStaticMesh(const FFbxInfo& Raw, FStaticMeshData& Out);
 
 	static void Destroy(fbxsdk::FbxManager*& Manager);
 

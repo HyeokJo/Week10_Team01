@@ -23,6 +23,9 @@ bool FLineBatcher::Init(FRenderer* InRenderer, UWorld* InWorld)
 	PipelineState.Shader = LineShader;
 	PipelineState.Topology = D3D11_PRIMITIVE_TOPOLOGY_LINELIST;
 
+	ForegroundPipelineState = PipelineState;
+	ForegroundPipelineState.DepthStencilState = EDepthStencilState::Disabled;
+
 	MaxVertices = 65536;
 	VertexBufferBase = new FVertex[MaxVertices];
 
@@ -53,6 +56,13 @@ void FLineBatcher::BeginFrame()
 {
 	VertexBufferPtr = VertexBufferBase;
 	VertexCount = 0;
+	ForegroundVertices.Reset();
+}
+
+void FLineBatcher::AddForegroundLine(const FVector& A, const FVector& B, const FVector4& Color)
+{
+	ForegroundVertices.Add({ A, FVector2(), Color });
+	ForegroundVertices.Add({ B, FVector2(), Color });
 }
 
 void FLineBatcher::AddLine(const FVector& A, const FVector& B, const FVector4& Color)
@@ -198,12 +208,29 @@ void FLineBatcher::Flush()
 void FLineBatcher::OnRender(const FMatrix& ViewProjection)
 {
 	//BuildVertexBuffer();
-	if (VertexCount == 0) return;
+	// 항상 위 선은 일반 선 뒤에 이어 붙여 같은 버퍼로 한 번에 올린다
+	const uint32 NormalCount = VertexCount;
+	const uint32 ForegroundCount = std::min(static_cast<uint32>(ForegroundVertices.Num()), MaxVertices - NormalCount);
+	if (ForegroundCount > 0)
+	{
+		std::memcpy(VertexBufferBase + NormalCount, ForegroundVertices.GetData(), sizeof(FVertex) * ForegroundCount);
+	}
+	if (NormalCount + ForegroundCount == 0) return;
 
 	FMatrix VP = ViewProjection;
-	RenderCommand::UpdateBufferData(VertexBuffer.get(), VertexBufferBase, sizeof(FVertex) * VertexCount);
+	RenderCommand::UpdateBufferData(VertexBuffer.get(), VertexBufferBase, sizeof(FVertex) * (NormalCount + ForegroundCount));
 	RenderCommand::UpdateBufferData(CB.get(), &VP, sizeof(FMatrix));
 
-	Flush();
+	if (NormalCount > 0)
+	{
+		Flush();
+	}
+	if (ForegroundCount > 0)
+	{
+		RenderCommand::BindPipelineState(ForegroundPipelineState);
+		RenderCommand::BindVertexBuffer(VertexBuffer.get());
+		RenderCommand::BindConstantBuffer(0, CB.get(), EShaderBindFlagBits::Vertex);
+		RenderCommand::Draw(ForegroundCount, NormalCount);   // 두 번째 인자 = 시작 정점
+	}
 }
 
