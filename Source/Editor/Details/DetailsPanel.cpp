@@ -18,6 +18,7 @@
 #include "Component/CapsuleComponent.h"
 #include "Component/ScriptComponent.h"
 #include "Component/DecalComponent.h"
+#include "Collision/Ray.h"
 #include "Camera/CameraComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 
@@ -1629,6 +1630,16 @@ void FDetailsPanel::OnRender()
 			}
 			if (UDecalComponent* DecalComponent = Cast<UDecalComponent>(TargetComponent))
 			{
+				if (ImGui::Button("Snap to Surface"))
+				{
+					const FMatrix World = DecalComponent->GetWorldMatrix();
+					const FVector Forward = World.TransformVector(FVector::ForwardVector).GetSafeNormal();
+					const float HalfDepth = World.TransformVector(FVector::ForwardVector).Size() * DecalComponent->GetDecalSize().X;
+					if (!DecalComponent->ProjectOntoSurface({DecalComponent->GetWorldLocation() - Forward * (HalfDepth + 0.05f), Forward}))
+						HTR_LOG(Warning, "Decal: no receiving mesh found along the projection direction");
+				}
+				if (ImGui::IsItemHovered())
+					ImGui::SetTooltip("Align to the nearest surface along local +X and reduce projection thickness to 0.1 world units.");
 				DrawDecalMaterial(DecalComponent);
 			}
 			if (ULightComponent* Light = Cast<ULightComponent>(TargetComponent))

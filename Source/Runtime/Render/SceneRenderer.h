@@ -64,9 +64,10 @@ public:
 		const FRenderingInfo& SceneInfo, const FRenderingInfo& ViewInfo, FTexture2D* DecalBaseColorTarget, FTexture2D* DecalNormalTarget, FTexture2D* FxaaTemp, FRenderQueue& RenderQueue);
 
 private:
-	// 불투명 물체에 대한 Pass
-	void RenderOpaquePass(const FSceneView& SceneView, const FSceneRenderSettings& Settings, const UWorld& ViewWorld,
-		const FRenderingInfo& SceneInfo, FRenderQueue& RenderQueue, const FDirectionalLightInfo& DirectionalLight, FTexture2D* DecalBaseColorTarget, FTexture2D* DecalNormalTarget, const FFrustumPlanes& FrustumPlanes);
+	// Returns whether the prepass populated ReceiverNormals for this view.
+	bool RenderOpaquePass(const FSceneView& SceneView, const FSceneRenderSettings& Settings, const UWorld& ViewWorld,
+		const FRenderingInfo& SceneInfo, FRenderQueue& RenderQueue, const FDirectionalLightInfo& DirectionalLight, FTexture2D* DecalBaseColorTarget, FTexture2D* DecalNormalTarget, const FFrustumPlanes& FrustumPlanes,
+		FTexture2D* ReceiverNormals);
 	// 월드에 배치된 텍스트 그리기
 	void DrawWorldText(const FSceneView& SceneView, const UWorld& ViewWorld);
 	// 안개에 대한 Pass
@@ -82,7 +83,8 @@ private:
 
 	void RenderReceiverDecalPass(const FSceneView& SceneView, const FSceneRenderSettings& Settings, const UWorld& ViewWorld);
 	void RenderScreenSpaceDecalPass(const FSceneView& SceneView, const FSceneRenderSettings& Settings, const UWorld& ViewWorld,
-		const FRenderingInfo& SceneInfo, FTexture2D* OutputTarget, FTexture2D* NormalTarget, const FFrustumPlanes& FrustumPlanes, bool bRenderAsUnlit);
+		const FRenderingInfo& SceneInfo, FTexture2D* OutputTarget, FTexture2D* NormalTarget, const FFrustumPlanes& FrustumPlanes, bool bRenderAsUnlit,
+		FTexture2D* ReceiverNormals = nullptr);
 	void RenderTranslucentPass(const FSceneView& SceneView, const FSceneRenderSettings& Settings, const UWorld& ViewWorld, const FRenderingInfo& SceneInfo);
 
 	FRenderer* Renderer = nullptr;

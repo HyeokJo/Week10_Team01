@@ -15,8 +15,10 @@ struct FScreenSpaceDecalViewConstants
     FMatrix InverseViewProjection;
     FVector2 ViewportOrigin;
     FVector2 InverseViewportSize;
+    uint32 bHasReceiverNormals = 0;
+    uint32 Padding[3] = {};
 };
-static_assert(sizeof(FScreenSpaceDecalViewConstants) == 80);
+static_assert(sizeof(FScreenSpaceDecalViewConstants) == 96);
 
 struct FScreenSpaceDecalInstance
 {
@@ -38,7 +40,7 @@ class FScreenSpaceDecalRenderer
 public:
     bool Init();
     void OnRender(FTexture2D* DepthTexture, const FMatrix& ViewProjection, const TArray<const FDecalSceneProxy*>& Decals,
-        const FViewportSettings& Viewport, bool bOrthographic, bool bWriteNormals = false);
+        const FViewportSettings& Viewport, bool bOrthographic, bool bWriteNormals = false, FTexture2D* ReceiverNormals = nullptr);
 private:
     struct FBatch
     {

@@ -116,7 +116,8 @@ float4 mainPS(PSInput input) : SV_TARGET
     // Geometric receiver normal controls coverage; normal maps only affect lighting.
     float AngleFade = ComputeDecalAngleFade(input.WorldNormal, ProjectionDirection,
         float2(AngleFadeCosEnd, AngleFadeCosStart));
-    Color.a *= Opacity * AngleFade;
+    float DepthFade = saturate(4.0f - 4.0f * abs(input.DecalPosition.x));
+    Color.a *= Opacity * AngleFade * DepthFade;
     if (AngleFade <= 0.0f)
         discard;
 
