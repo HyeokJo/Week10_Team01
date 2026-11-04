@@ -13,6 +13,7 @@
 #include "Component/ScriptComponent.h"
 #include "Component/PrimitiveComponent.h"
 #include "Component/MovementComponent.h"
+#include "Component/DecalComponent.h"
 #include "Camera/CameraTypes.h"
 
 enum class EAttachmentRule;
@@ -466,6 +467,10 @@ UActorComponent* AActor::AddComponent(UClass* ComponentClass, FName Name)
 			Primitive->OnHit.AddRaw(ScriptComp, &UScriptComponent::HanldeOnCollisionHit);
 		}
 	}
+	else if (UDecalComponent* Decal = Cast<UDecalComponent>(NewComponent))
+	{
+		World->GetScene().AddDecal(Decal);
+	}
 
 	//ScriptComponent가 추가될 때
 	if (UScriptComponent* ScriptComponent = Cast<UScriptComponent>(NewComponent))
@@ -559,6 +564,10 @@ void AActor::DestroyComponent(UActorComponent* Component)
 	else if (ULightComponentBase* Light = Cast<ULightComponentBase>(Component))
 	{
 		World->GetScene().RemoveLight(Light);
+	}
+	else if (UDecalComponent* Decal = Cast<UDecalComponent>(Component))
+	{
+		World->GetScene().RemoveDecal(Decal);
 	}
 	RemoveOwnedComponent(Component);
 	delete Component;

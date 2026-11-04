@@ -457,3 +457,6 @@ CLAUDE.md
 # FBX SDK 라이브러리 (debug/release 폴더 무시 규칙의 예외)
 !Source/ThirdParty/FBXSDK/lib/x64/debug/
 !Source/ThirdParty/FBXSDK/lib/x64/release/
+
+AGENTS.md
+

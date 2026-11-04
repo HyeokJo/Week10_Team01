@@ -12,6 +12,8 @@
 
 class FLightSceneProxy;
 class ULightComponentBase;
+class UDecalComponent;
+class FDecalSceneProxy;
 
 struct FExponentialHeightFogSceneInfo
 {
@@ -22,6 +24,7 @@ struct FExponentialHeightFogSceneInfo
 class FScene
 {
 public:
+	FScene();
 	void AddPrimitive(UPrimitiveComponent* Component);
 	void RemovePrimitive(UPrimitiveComponent* Component);
 	// 모든 프록시를 한 번에 지운다. 액터를 통째로 지우기 전(ClearWorld)에 불러야 지워진 컴포넌트를 가리키는 프록시가 남지 않는다.
@@ -89,4 +92,18 @@ public:
 	bool bElementListChanged = false;
 	bool bShadowDirty = true;
 	inline static bool bCacheWholeSceneShadows = true;
+
+	void AddDecal(UDecalComponent* Component);
+	void RemoveDecal(UDecalComponent* Component);
+	void RemoveAllDecals();
+
+	void MarkDecalDirty(FDecalSceneProxy* Proxy);
+
+	const TArray<FDecalSceneProxy*>& GetDecalProxies() const { return DecalProxies; }
+	const TBVH<FDecalSceneProxy*>& GetDecalBVH() const { return DecalBVH; }
+private:
+	TArray<FDecalSceneProxy*> DirtyDecals;
+	TArray<FDecalSceneProxy*> DecalProxies;
+	TBVH<FDecalSceneProxy*> DecalBVH;
+	bool bDecalElementListChanged = false;
 };

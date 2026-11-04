@@ -26,6 +26,11 @@ void FRenderResourceManager::ScanShaders(const fs::path& ShaderRoot)
 
 		FString Path = Entry.path().generic_string();
 		LoadOrCompileShader(Path);
+		if (Entry.path().filename() == "DecalProjectionShader.hlsl")
+		{
+			const D3D_SHADER_MACRO Defines[] = { { "DECAL_WRITE_NORMAL", "0" }, { nullptr, nullptr } };
+			LoadOrCompileShader(Path, "_COLORONLY", Defines);
+		}
 	}
 }
 

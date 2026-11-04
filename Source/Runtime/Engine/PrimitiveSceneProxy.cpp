@@ -51,6 +51,7 @@ void FPrimitiveSceneProxy::UpdateRenderState()
     bVisible = Component->IsVisible();
     bCastShadow = Component->IsCastShadow();
     bReceiveShadow = Component->IsReceiveShadow();
+	bReceiveDecal = Component->IsReceiveDecal();
 	bHiddenInGame = Component->IsHiddenInGame();
 
     // 컴포넌트 종류를 묻지 않는다. 그릴 자원이 있으면 받고, 없으면(빌보드·텍스트) 느린 경로로 간다
