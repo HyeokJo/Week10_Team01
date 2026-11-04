@@ -47,6 +47,7 @@ private:
 	bool bFocusRequested = false;
 
 	const USkeletalMesh* BoneTreeMesh = nullptr;
+	uint32 BoneTreeRevision = 0;
 	TArray<TArray<int32>> BoneChildren;
 	TArray<int32> RootBones;
 

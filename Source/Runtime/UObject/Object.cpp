@@ -13,6 +13,77 @@
 
 TArray<UObject*> GUObjectArray;
 
+namespace
+{
+	struct FUnresolvedAssetRef
+	{
+		FString AssetPath;
+		UObject* LoadedValue = nullptr;   // 이 값이 그대로일 때만 키를 저장한다. 사용자가 다른 에셋을 고르면 그 선택이 우선이다
+	};
+
+	// 씬 하나에 몇 개뿐이라 모든 UObject에 멤버를 두지 않고 따로 모은다
+	// UObject가 프로그램 끝에 지워질 수 있어 해제하지 않는다
+	std::unordered_map<const UObject*, TMap<FString, FUnresolvedAssetRef>>& GetUnresolvedAssetRefs()
+	{
+		static auto* Refs = new std::unordered_map<const UObject*, TMap<FString, FUnresolvedAssetRef>>();
+		return *Refs;
+	}
+
+	bool bMissingAssetReported = false;
+	FString MissingAssetPath;
+	const FString* PendingSavePath = nullptr;
+}
+
+void AssetReferenceSerialization::ReportMissing(const FString& AssetPath)
+{
+	bMissingAssetReported = true;
+	MissingAssetPath = AssetPath;
+}
+
+const FString* AssetReferenceSerialization::GetPendingSavePath()
+{
+	return PendingSavePath;
+}
+
+void AssetReferenceSerialization::ResolveMissing(const FString& AssetPath, UObject* Asset)
+{
+	auto& UnresolvedRefs = GetUnresolvedAssetRefs();
+	if (UnresolvedRefs.empty() || !Asset)
+	{
+		return;
+	}
+
+	for (auto& [ConstObject, Refs] : UnresolvedRefs)
+	{
+		UObject* Object = const_cast<UObject*>(ConstObject);
+		for (UClass* Class = Object->GetClass(); Class; Class = Class->Super)
+		{
+			for (const FProperty& Property : Class->GetProperties())
+			{
+				if (Property.Type != EPropertyType::Object)
+				{
+					continue;
+				}
+
+				const FUnresolvedAssetRef* Unresolved = Refs.Find(Property.Name);
+				if (!Unresolved || Unresolved->AssetPath != AssetPath)
+				{
+					continue;
+				}
+
+				// 그 사이 사용자가 다른 값을 골랐거나 클래스가 맞지 않으면 건드리지 않는다
+				UObject*& Value = *reinterpret_cast<UObject**>(reinterpret_cast<uint8*>(Object) + Property.Offset);
+				if (Value == Unresolved->LoadedValue && (!Property.Class || Asset->IsA(Property.Class)))
+				{
+					Value = Asset;
+					Object->PostEditChangeProperty(Property);
+				}
+				Refs.Remove(Property.Name);
+			}
+		}
+	}
+}
+
 UObject::UObject()
 {
 	ObjectUUID = FEngineStatics::GetUUID();
@@ -27,6 +98,11 @@ UObject::UObject(bool bRegister)
 
 UObject::~UObject()
 {
+	if (auto& UnresolvedRefs = GetUnresolvedAssetRefs(); !UnresolvedRefs.empty())
+	{
+		UnresolvedRefs.erase(this);
+	}
+
 	if (bIsRegistered)
 	{
 		if (ClassPrivate)
@@ -244,13 +320,54 @@ void UObject::SerializeScriptProperties(FStructuredArchive::FSlot Slot)
 			{
 				UObject*& Ref = *static_cast<UObject**>(Ptr);
 				UObject* Previous = Ref;
+				auto& UnresolvedRefs = GetUnresolvedAssetRefs();
+
+				// 저장: 불러올 때 못 찾은 키가 있고 값을 아무도 안 바꿨으면 기본값 대신 그 키를 쓴다
+				if (!bIsLoading)
+				{
+					if (const auto Found = UnresolvedRefs.find(this); Found != UnresolvedRefs.end())
+					{
+						if (const FUnresolvedAssetRef* Unresolved = Found->second.Find(Property.Name))
+						{
+							if (Unresolved->LoadedValue == Ref)
+								PendingSavePath = &Unresolved->AssetPath;
+							else
+								Found->second.Remove(Property.Name);
+						}
+					}
+				}
+				bMissingAssetReported = false;
+
 				Value << Ref;
 
-				// 불러온 객체가 프로퍼티가 기대하는 클래스가 아니면 되돌린다 (기존 Asset->IsA(Property.Class) 검사)
-				if (bIsLoading && Ref && Property.Class && !Ref->IsA(Property.Class))
+				PendingSavePath = nullptr;
+
+				if (bIsLoading)
 				{
-					HTR_LOG(Warning, "Load: '{}' is not a {}, keeping default", Property.Name, Property.Class->Name);
-					Ref = Previous;
+					FString UnresolvedPath;
+					if (bMissingAssetReported)
+					{
+						UnresolvedPath = MissingAssetPath;
+					}
+					// 불러온 객체가 프로퍼티가 기대하는 클래스가 아니면 되돌린다 (기존 Asset->IsA(Property.Class) 검사)
+					else if (Ref && Property.Class && !Ref->IsA(Property.Class))
+					{
+						HTR_LOG(Warning, "Load: '{}' is not a {}, keeping default", Property.Name, Property.Class->Name);
+						if (const UAsset* Asset = Cast<UAsset>(Ref))
+						{
+							UnresolvedPath = Asset->GetPath();
+						}
+						Ref = Previous;
+					}
+
+					if (!UnresolvedPath.empty())
+					{
+						UnresolvedRefs[this].Add(Property.Name, FUnresolvedAssetRef{ UnresolvedPath, Ref });
+					}
+					else if (const auto Found = UnresolvedRefs.find(this); Found != UnresolvedRefs.end())
+					{
+						Found->second.Remove(Property.Name);
+					}
 				}
 				break;
 			}

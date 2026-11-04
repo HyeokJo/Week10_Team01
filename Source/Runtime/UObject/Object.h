@@ -74,6 +74,17 @@ public:                                                                 \
     inline static FAutoRegister AutoRegister;							\
 private:																
 
+// 씬을 열 때 못 찾은 에셋의 키를 잃지 않기 위한 통로. 참조를 경로로 읽고 쓰는 JSON 포매터가 쓴다
+// 키를 버리면 기본값(큐브 등)이 그대로 저장되어, 에셋을 다시 임포트해도 씬이 원래 메시로 돌아오지 못한다
+class UObject;
+namespace AssetReferenceSerialization
+{
+	void ReportMissing(const FString& AssetPath);
+	const FString* GetPendingSavePath();
+	// 에셋이 뒤늦게 생겼을 때(임포트) 그 키를 기다리던 프로퍼티에 연결한다
+	void ResolveMissing(const FString& AssetPath, UObject* Asset);
+}
+
 class UObject
 {
 	friend UObject* StaticConstructObject_Internal(const struct FStaticConstructObjectParameters& Params);

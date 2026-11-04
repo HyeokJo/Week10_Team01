@@ -69,9 +69,18 @@ public:
 	UFont* LoadFontAtlas(const FString& JsonPath, const FString& AtlasTexturePath);
 	static UStaticMesh* LoadObjStaticMesh(const FString& Path);
 	static ULevelSequence* LoadLevelSequence(const FString& Path);
-	static void LoadFbx(const FString& Path, const FFbxImportOptions& Option);
-	static UStaticMesh* LoadFbxStaticMesh(const FString& Path, const FFbxImportOptions& Option);
-	static USkeletalMesh* LoadFbxSkeletalMesh(const FString& Path, const FFbxImportOptions& Option);
+	// .hasset 하나를 읽어 등록한다. 이미 있으면 true, 파일이 없거나 읽지 못하면 false다
+	static bool LoadMeshAsset(const FString& AssetPath);
+	// FBX·OBJ를 파싱해 메시를 만들고 AssetPath에 .hasset을 저장한다. 원본은 프로젝트 밖에 있어도 된다
+	// Assets 밖의 텍스처는 메시 옆으로 복사한다. 실패하면 nullptr이다
+	static UAsset* ImportMesh(const FString& SourcePath, const FString& AssetPath, const FFbxImportOptions& Option);
+	// 이미 로드된 메시의 내용을 원본에서 다시 만든다. 메시 객체는 그대로이고 쓰는 컴포넌트를 갱신한다
+	// 프레임 사이에 불러야 한다. 원본을 읽지 못하면 메시와 파일은 그대로다
+	static bool ReimportMesh(const FString& SourcePath, const FString& AssetPath, const FFbxImportOptions& Option);
+	// 시작할 때 임포트 결과를 찾지 못한 FBX 파일들
+	static const TArray<FString>& GetUnimportedFbxPaths() { return Get().UnimportedFbxPaths; }
+	// 파일 경로("Assets/Models/a.fbx") -> 에셋 키("Models/a.fbx")
+	static FString GetAssetKeyFromPath(const FString& Path);
 
 	FLODGenerateResult GenerateStaticMeshLODs(UStaticMesh& Mesh,const FLODGenerateRequest& Request);
 
@@ -85,6 +94,7 @@ public:
 private:
 	TMap<FString, FString> AssetPathMap;
 	TMap<FString, UAsset*> AssetMap;
+	TArray<FString> UnimportedFbxPaths;
 
 	//TMap<FString, UStaticMesh*> MeshMap;	// KEY: FILE NAME OR 쉐입 첫글자 대문자
 	TMap<FString, TUniquePtr<FShader>> ShaderMap;	// KEY: FILE NAME

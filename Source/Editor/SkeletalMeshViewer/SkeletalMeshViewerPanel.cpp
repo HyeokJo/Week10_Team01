@@ -210,7 +210,7 @@ void FSkeletalMeshViewerPanel::DrawSideColumn(const ImVec2& Size)
 	if (!Mesh)
 		return;
 
-	if (BoneTreeMesh != Mesh)
+	if (BoneTreeMesh != Mesh || BoneTreeRevision != Mesh->Revision)
 	{
 		RebuildBoneTree(*Mesh);
 	}
@@ -410,6 +410,7 @@ void FSkeletalMeshViewerPanel::SelectBone(const int32 BoneIndex)
 void FSkeletalMeshViewerPanel::RebuildBoneTree(const USkeletalMesh& Mesh)
 {
 	BoneTreeMesh = &Mesh;
+	BoneTreeRevision = Mesh.Revision;
 	DetailBone = -1;
 
 	const TArray<FBoneInfo>& Bones = Mesh.GetSkeleton().Bones;
