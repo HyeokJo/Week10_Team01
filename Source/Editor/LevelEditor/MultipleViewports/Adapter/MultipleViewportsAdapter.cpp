@@ -526,6 +526,7 @@ void FMultipleViewportsAdapter::CaptureWorld(UWorld& World)
     for (int32 i = 0; i < Count;++i)
     {
         if (!Scene.PrimitiveFlags[i]) continue;
+        if (!Scene.Proxies[i]->IsVisible()) continue;   // ShowFlag처럼 컴포넌트는 켜져 있어도 프록시가 숨긴 경우
         UPrimitiveComponent* Primitive = Scene.Proxies[i]->GetComponent();
         if (!Primitive || !Primitive->IsVisible() || !Primitive->GetOwner() ||
             Primitive->GetOwner()->GetWorld() != &World) continue;

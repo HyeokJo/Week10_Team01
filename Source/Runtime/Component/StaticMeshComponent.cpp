@@ -40,6 +40,17 @@ void UStaticMeshComponent::SetStaticMesh(UStaticMesh* InStaticMesh)
 	OnTransformDirty();
 }
 
+void UStaticMeshComponent::OnMeshReimported(const int32 PreviousSlotCount)
+{
+	// 슬롯 수가 그대로면 사용자가 덮어쓴 머티리얼을 유지한다
+	if (PreviousSlotCount != GetNumMaterials())
+	{
+		ClearOverrideMaterials();
+	}
+	MarkRenderStateDirty();
+	OnTransformDirty();
+}
+
 int32 UStaticMeshComponent::GetNumMaterials() const
 {
 	return StaticMesh ? static_cast<int32>(StaticMesh->GetMeshData().MaterialSlots.Num()) : 0;

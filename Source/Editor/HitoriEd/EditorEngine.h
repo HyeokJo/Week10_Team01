@@ -33,6 +33,7 @@
 #include "Editor/HitoriEd/EditorSelection.h"
 #include "Editor/SkeletalMeshViewer/SkeletalMeshViewer.h"
 #include "Editor/SkeletalMeshViewer/SkeletalMeshViewerPanel.h"
+#include "Editor/AssetImport/MeshImportWindow.h"
 
 #include "Render/SkyboxRenderer.h"
 
@@ -93,6 +94,8 @@ private:
 	void TickWorldAndEditor(float DeltaTime);
 	// 한 번 캡처한 월드 결과를 재사용해 현재 레이아웃의 각 View를 렌더한다.
 	void RenderMultipleViewports();
+	// 창에서 Import를 누른 파일을 임포트한다. 메시와 텍스처를 만들므로 프레임 시작에 부른다.
+	void ProcessMeshImportRequest();
 	// 패널에서 온 열기·닫기 요청을 처리한다. ImGui 그리기 도중에 월드를 만들거나 지우지 않도록 프레임 시작에 부른다.
 	void ProcessSkeletalMeshViewerRequests();
 	// 단축키가 레벨이 아니라 뷰어를 향하는가. 레벨 뷰포트 위에 커서가 있으면 레벨이 우선이다.
@@ -164,6 +167,7 @@ private:
 	FSkeletalMeshViewer SkeletalMeshViewer;
 	FSkeletalMeshViewerPanel* SkeletalMeshViewerPanel = nullptr;
 	FString PendingViewerFbxPath;
+	FMeshImportWindow MeshImportWindow;
 
 	UWorld* EditorWorld = nullptr;
 	UWorld* PlayWorld = nullptr;

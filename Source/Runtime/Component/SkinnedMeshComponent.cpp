@@ -26,6 +26,16 @@ void USkinnedMeshComponent::SetSkeletalMesh(USkeletalMesh* InSkeletalMesh)
 	OnSkeletalMeshChanged();
 }
 
+void USkinnedMeshComponent::OnMeshReimported(const int32 PreviousSlotCount)
+{
+	// 슬롯 수가 그대로면 사용자가 덮어쓴 머티리얼을 유지한다
+	if (PreviousSlotCount != GetNumMaterials())
+	{
+		ClearOverrideMaterials();
+	}
+	OnSkeletalMeshChanged();
+}
+
 void USkinnedMeshComponent::OnSkeletalMeshChanged()
 {
 	// 렌더 자원 다시 만들기. 옛 자원이 지워지면 프록시의 Mesh 포인터는 비워진다

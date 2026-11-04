@@ -228,7 +228,10 @@ void FJsonArchiveInputFormatter::Serialize(UObject*& Value)
     if (UAsset* Asset = UAssetManager::GetAssetByPath<UAsset>(AssetPath))
         Value = Asset;
     else
+    {
         HTR_LOG(Warning, "Load: asset '{}' not found, keeping default", AssetPath);
+        AssetReferenceSerialization::ReportMissing(AssetPath);
+    }
 }
 
 void FJsonArchiveInputFormatter::Serialize(void* Data, uint64 DataSize)

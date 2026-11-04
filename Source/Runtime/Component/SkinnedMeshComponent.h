@@ -22,6 +22,8 @@ public:
 	// 메시가 바뀌면 덮어쓰기를 비우고 OnSkeletalMeshChanged를 부른다
 	void SetSkeletalMesh(USkeletalMesh* InSkeletalMesh);
 	USkeletalMesh* GetSkeletalMesh() const { return SkeletalMesh; }
+	// 메시 내용이 리임포트로 바뀐 뒤 부른다. 포즈와 렌더 자원을 새 데이터로 다시 만든다
+	void OnMeshReimported(int32 PreviousSlotCount);
 
 	// 렌더러는 이 자원만 본다. UStaticMesh를 거치지 않는다
 	virtual FMeshRenderResource* GetRenderResource() const override;

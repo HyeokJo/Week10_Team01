@@ -4,6 +4,7 @@
 #include "Render/ColorWorkflow.h"
 #include <Core/StatOverlay.h>
 #include "Component/DecalComponent.h"
+#include "Component/SkinnedMeshComponent.h"
 #include "DecalSceneProxy.h"
 
 FScene::FScene() : DecalBVH([](const FDecalSceneProxy* Proxy) { return Proxy->GetBounds(); }) {}
@@ -24,6 +25,22 @@ void FScene::AddPrimitive(UPrimitiveComponent* Component)
 	PrimitiveFlags.Add(0);
 
 	bElementListChanged = true;
+}
+
+void FScene::SetShowSkeletalMeshes(const bool bInShow)
+{
+	if (bShowSkeletalMeshes == bInShow)
+		return;
+
+	bShowSkeletalMeshes = bInShow;
+	// 프록시가 가시성을 복사해 들고 있으므로 다시 읽게 한다 (그림자 캐시도 이 호출로 무효화된다)
+	for (FPrimitiveSceneProxy* Proxy : Proxies)
+	{
+		if (Cast<USkinnedMeshComponent>(Proxy->GetComponent()))
+		{
+			MarkRenderStateDirty(Proxy);
+		}
+	}
 }
 
 void FScene::RemovePrimitive(UPrimitiveComponent* Component)

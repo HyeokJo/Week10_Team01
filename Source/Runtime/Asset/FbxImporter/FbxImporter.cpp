@@ -160,8 +160,9 @@ namespace
 		{
 			if (!Candidate.empty() && fs::exists(Candidate, Error))
 			{
-				// 엔진은 작업 폴더(저장소 루트) 기준 경로를 쓴다
-				return fs::relative(Candidate, fs::current_path(), Error).generic_string();
+				// 엔진은 작업 폴더(저장소 루트) 기준 경로를 쓴다. 다른 드라이브면 상대 경로를 만들 수 없어 절대 경로를 쓴다
+				const fs::path Relative = fs::relative(Candidate, fs::current_path(), Error);
+				return (Error || Relative.empty() ? fs::absolute(Candidate) : Relative).generic_string();
 			}
 		}
 

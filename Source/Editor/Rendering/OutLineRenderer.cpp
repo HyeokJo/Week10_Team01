@@ -3,6 +3,7 @@
 #include "Asset/AssetManager.h"
 #include "Render/RenderCommand.h"
 #include "Render/RenderResourceManager.h"
+#include "Engine/PrimitiveSceneProxy.h"
 #include "GameFramework/Actor.h"
 
 // 스텐실 마스크·외곽선 두 패스의 Shader와 상수 버퍼를 준비한다.
@@ -50,7 +51,10 @@ void FOutlineRenderer::OnRender(const FOutline& InOutline, const FMatrix& InView
 	{
 		const FMeshRenderResource* TargetMesh = Target ? Target->GetRenderResource() : nullptr;
 		const bool bInViewWorld = !ViewWorld || (Target->GetOwner() && Target->GetOwner()->GetWorld() == ViewWorld);
-		if (TargetMesh && TargetMesh->GetIndexBuffer(0) && bInViewWorld)
+		// 컴포넌트는 켜져 있는데 프록시만 꺼져 있으면 ShowFlag가 숨긴 것이다. 컴포넌트를 직접 끈 경우는 찾을 수 있게 외곽선을 남긴다
+		const FPrimitiveSceneProxy* Proxy = Target ? Target->GetSceneProxy() : nullptr;
+		const bool bHiddenByShowFlag = Proxy && Target->IsVisible() && !Proxy->IsVisible();
+		if (TargetMesh && TargetMesh->GetIndexBuffer(0) && bInViewWorld && !bHiddenByShowFlag)
 			Targets.Add(Target);
 	}
 	if (Targets.IsEmpty())

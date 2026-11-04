@@ -24,6 +24,9 @@ public:
 	// 삼각형 구성은 포즈와 무관하므로 모든 컴포넌트가 이 하나를 같이 쓴다 (static)
 	TUniquePtr<FIndexBuffer> IndexBuffer;
 
+	// 리임포트로 내용이 바뀌면 올라간다. 포인터가 그대로라 뼈 목록을 캐시한 쪽이 이 값으로 변화를 안다
+	uint32 Revision = 0;
+
 	const FSkeletalMeshData& GetMeshData() const { return MeshData; }
 	const FReferenceSkeleton& GetSkeleton() const { return MeshData.Skeleton; }
 

@@ -40,6 +40,7 @@ void FSettingsPanel::OnRender()
 	ImGui::SeparatorText("Show");
 
 	ImGui::Checkbox("Primitives", &Settings.bDrawPrimitives);
+	ImGui::Checkbox("Skeletal Meshes", &Settings.bShowSkeletalMeshes);
 	ImGui::Checkbox("Decals", &Settings.bDrawDecals);
 	ImGui::Combo("Decal Method", &Settings.DecalRenderMode, "Receiver Mesh\0Screen Space\0");
 	ImGui::Checkbox("Bounding Boxes", &Settings.bDrawBoundingBox);
@@ -176,6 +177,7 @@ bool FSettingsPanel::SaveSettings() const
 	// 섹션은 Settings 패널의 섹션과 같은 순서로 쓴다
 	File << "[Show]\n";
 	File << "DrawPrimitives=" << Settings.bDrawPrimitives << "\n";
+	File << "ShowSkeletalMeshes=" << Settings.bShowSkeletalMeshes << "\n";
 	File << "DrawDecals=" << Settings.bDrawDecals << "\n";
 	File << "DecalRenderMode=" << Settings.DecalRenderMode << "\n";
 	File << "DrawBoundingBox=" << Settings.bDrawBoundingBox << "\n";
@@ -333,6 +335,7 @@ bool FSettingsPanel::LoadSettings()
                     }
                 }
                 if (Key == "DrawPrimitives") Settings.bDrawPrimitives = std::stoi(ValueStr);
+				else if (Key == "ShowSkeletalMeshes") Settings.bShowSkeletalMeshes = std::stoi(ValueStr);
 				else if (Key == "DrawDecals") Settings.bDrawDecals = std::stoi(ValueStr);
 				else if (Key == "DecalRenderMode") Settings.DecalRenderMode = FMath::Clamp(std::stoi(ValueStr), 0, 1);
 				else if (Key == "DrawBoundingBox") Settings.bDrawBoundingBox = std::stoi(ValueStr);

@@ -44,6 +44,7 @@
 #include "Component/DecalComponent.h"
 #include "GameFramework/Actor/DecalActor.h"
 #include "Engine/GameViewportClient.h"
+#include "Asset/MeshAssetFile.h"
 
 namespace
 {
@@ -129,9 +130,46 @@ bool UEditorEngine::Init()
 	});
 	SkeletalMeshViewerPanel = EditorUI->AddEditorPanel<FSkeletalMeshViewerPanel>();
 	SkeletalMeshViewerPanel->SetViewer(&SkeletalMeshViewer);
-	ContentDrawerPanel->SetOpenFbxBinding([this](const FString& Path)
+	MeshImportWindow.Init(UAssetManager::GetUnimportedFbxPaths());
+	ContentDrawerPanel->SetOpenMeshBinding([this](const FString& Path)
 	{
 		PendingViewerFbxPath = Path;
+	});
+	ContentDrawerPanel->SetImportMeshBinding([this](const FString& TargetFolder)
+	{
+		if (IsPlaying())
+		{
+			HTR_LOG(Warning, "Cannot import during PIE. Stop the play session first.");
+			return;
+		}
+		for (const FString& Path : FEditorFileUtils::OpenImportMeshDialog())
+		{
+			MeshImportWindow.Enqueue(Path, TargetFolder);
+		}
+	});
+	ContentDrawerPanel->SetReimportMeshBinding([this](const FString& AssetPath, const FString& SourcePath)
+	{
+		if (IsPlaying())
+		{
+			HTR_LOG(Warning, "Cannot reimport during PIE. Stop the play session first.");
+			return;
+		}
+
+		FString Source = SourcePath;
+		if (Source.empty())
+		{
+			const TArray<FString> Picked = FEditorFileUtils::OpenImportMeshDialog();
+			if (Picked.IsEmpty())
+				return;
+			Source = Picked[0];
+		}
+
+		// 파일이 깨져 옵션을 못 읽으면 임포트 기본값에서 시작한다
+		FMeshAssetInfo Info;
+		Info.Options.bImportStaticMesh = true;
+		Info.Options.bImportSkeletalMesh = true;
+		FMeshAssetFile::ReadInfo(AssetPath, Info);
+		MeshImportWindow.EnqueueReimport(Source, AssetPath, Info.Options);
 	});
 
 	SceneRenderer.Init(Renderer);
@@ -331,6 +369,7 @@ void UEditorEngine::Tick(const float DeltaTime)
 
 	// 유저의 World 전환 요청을 처리한다.
 	TickWorldTravel();
+	ProcessMeshImportRequest();
 	ProcessSkeletalMeshViewerRequests();
 
 	BeginFrame(DeltaTime);
@@ -459,6 +498,10 @@ void UEditorEngine::TickWorldAndEditor(const float DeltaTime)
 	}
 	// 라이트 프록시가 아래 UpdateAllTransforms에서 바뀐 작업 흐름으로 다시 계산되도록 먼저 반영한다.
 	ColorWorkflow::bLinear = SettingsPanel->GetSettings().bLinearWorkflow;
+	// 프리뷰 월드에는 넘기지 않는다. 뷰어는 메시를 보려고 여는 창이라 레벨의 Show 설정을 따르지 않는다.
+	EditorWorld->GetScene().SetShowSkeletalMeshes(SettingsPanel->GetSettings().bShowSkeletalMeshes);
+	if (PlayWorld)
+		PlayWorld->GetScene().SetShowSkeletalMeshes(SettingsPanel->GetSettings().bShowSkeletalMeshes);
 	// 월드 캡처는 View마다 그릴 월드가 다르므로 RenderMultipleViewports에서 한다.
 	// PIE 중에도 PIE가 아닌 View에서는 EditorWorld 편집을 계속한다.
 	UpdateGizmoAndPicking();
@@ -572,6 +615,24 @@ void UEditorEngine::RenderMultipleViewports()
 		CameraPresets);
 }
 
+
+void UEditorEngine::ProcessMeshImportRequest()
+{
+	FMeshImportRequest Request;
+	FFbxImportOptions Options;
+	if (!MeshImportWindow.ConsumeImportRequest(Request, Options))
+		return;
+
+	const bool bSuccess = Request.bReimport
+		? UAssetManager::ReimportMesh(Request.SourcePath, Request.AssetPath, Options)
+		: UAssetManager::ImportMesh(Request.SourcePath, Request.AssetPath, Options) != nullptr;
+	if (!bSuccess)
+	{
+		HTR_LOG(Error, "Failed to import mesh: {}", Request.SourcePath);
+	}
+	MeshImportWindow.ReportImportResult(Request, bSuccess);
+}
+
 void UEditorEngine::ProcessSkeletalMeshViewerRequests()
 {
 	if (SkeletalMeshViewer.IsOpen() && !SkeletalMeshViewerPanel->IsOpen())
@@ -582,14 +643,35 @@ void UEditorEngine::ProcessSkeletalMeshViewerRequests()
 	if (PendingViewerFbxPath.empty())
 		return;
 
-	const FString Path = std::move(PendingViewerFbxPath);
+	const FString ClickedPath = std::move(PendingViewerFbxPath);
 	PendingViewerFbxPath.clear();
 
-	// 이미 임포트했으면 캐시를 돌려준다. 스킨이 없는 FBX는 nullptr이다.
-	USkeletalMesh* Mesh = UAssetManager::LoadFbxSkeletalMesh(Path, FFbxImportOptions{});
+	// 뷰어를 열지는 확장자가 아니라 로드된 에셋의 종류로 정한다. 키에는 .hasset이 없다
+	const bool bClickedAsset = fs::path(ClickedPath).extension() == FMeshAssetFile::Extension;
+	const FString Path = bClickedAsset ? FMeshAssetFile::StripExtension(ClickedPath) : ClickedPath;
+
+	const FString Key = UAssetManager::GetAssetKeyFromPath(Path);
+	USkeletalMesh* Mesh = UAssetManager::GetAssetByPath<USkeletalMesh>(Key);
 	if (!Mesh)
 	{
-		HTR_LOG(Warning, "Skeletal Mesh Viewer: '{}' is not a skeletal mesh", Path);
+		if (UAssetManager::GetAssetByPath<UAsset>(Key))
+		{
+			HTR_LOG(Info, "Skeletal Mesh Viewer: '{}' is not a skeletal mesh", Path);
+		}
+		else if (IsPlaying())
+		{
+			HTR_LOG(Warning, "Cannot import '{}' during PIE. Stop the play session first.", Path);
+		}
+		else if (bClickedAsset && !FMeshAssetFile::Exists(Path))
+		{
+			// 읽지 못한 에셋인데 다시 만들 원본이 옆에 없다
+			HTR_LOG(Warning, "Cannot open '{}': the asset could not be loaded and the source is missing", ClickedPath);
+		}
+		else
+		{
+			// 아직 임포트하지 않은 FBX는 옵션 창으로 보낸다
+			MeshImportWindow.Enqueue(Path, fs::path(Path).parent_path().generic_string());
+		}
 		return;
 	}
 
@@ -918,8 +1000,8 @@ void UEditorEngine::RenderOverlayPass(const FMultipleViewportsAdapter& Adapter, 
 		return Component && Component->GetOwner() && Component->GetOwner()->GetWorld() == &ViewWorld;
 	};
 
-	// 스텐실 기반이라 선택 대상의 가시성이 꺼져 있어도 외곽선만 그린다.
-	if (bShowEditorOverlay)
+	// 스텐실 기반이라 선택 대상의 가시성이 꺼져 있어도 외곽선만 그린다. 단 Show 설정으로 숨긴 물체는 외곽선도 뺀다.
+	if (bShowEditorOverlay && Settings.bDrawPrimitives)
 	{
 		OutlineRenderer->OnRender(*Outline, ViewProjection, PassInfo.ViewportSetting, &ViewWorld);
 	}
@@ -1282,6 +1364,7 @@ void UEditorEngine::PresentFrame()
 		ImGuiRenderer->Begin();
 
 		EditorUI->OnRender();
+		MeshImportWindow.OnRender();
 
 		ImGuiRenderer->End();
 	}
