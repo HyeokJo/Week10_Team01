@@ -34,7 +34,7 @@ public:
 
 	// 피킹: 자원이 CPU 삼각형을 주지 않으므로 World가 이 함수를 부른다. 스키닝된 정점으로 검사한다
 	virtual bool LineTraceComponentLocal(const FRay& LocalRay, float& OutT) override;
-	// 바운드: 에셋(바인드 포즈) AABB
+	// 바운드: 현재 포즈의 AABB. 렌더 자원이 없으면 에셋(바인드 포즈) AABB
 	virtual FBox CalcLocalBounds() const override;
 
 	// 뼈마다 Component Space 행렬 (부모가 항상 앞). 디버그 라인이 읽는다

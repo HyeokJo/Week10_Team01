@@ -117,6 +117,7 @@ bool USkinnedMeshComponent::LineTraceComponentLocal(const FRay& LocalRay, float&
 
 FBox USkinnedMeshComponent::CalcLocalBounds() const
 {
+	if (MeshObject) return MeshObject->GetRenderBounds();   // 현재 포즈의 바운드
 	return SkeletalMesh ? SkeletalMesh->GetMeshData().AABB : Super::CalcLocalBounds();
 }
 

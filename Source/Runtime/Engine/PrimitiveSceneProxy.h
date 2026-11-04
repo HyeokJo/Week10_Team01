@@ -16,6 +16,7 @@ public:
     void UpdateTransform();
     void UpdateRenderState();
     void OnMeshRenderDataChanged();
+    void OnMeshBoundsChanged();
     void OnMeshDestroyed();
 
     UPrimitiveComponent* GetComponent() const { return Component; }

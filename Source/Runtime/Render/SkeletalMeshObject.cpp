@@ -30,7 +30,7 @@ FSkeletalMeshObject::FSkeletalMeshObject(USkeletalMesh* InSkeletalMesh)
 			sizeof(FVertexPNCT) * static_cast<uint32>(SkinnedVertices.Num()));
 	}
 
-	// 바운드는 에셋(바인드 포즈) 것을 쓴다. 뼈를 크게 움직이면 실제 모양보다 작을 수 있다
+	// 처음 바운드는 에셋(바인드 포즈) 것이다. 포즈가 바뀌면 Update가 다시 잰다
 	const FBox& Box = Data.AABB;
 	FLODSphere Sphere;
 	Sphere.Center = (Box.Min + Box.Max) * 0.5f;
@@ -54,6 +54,10 @@ void FSkeletalMeshObject::Update(const TArray<FMatrix>& ComponentSpaceTransforms
 	{
 		SkinMatrices[i] = Bones[i].InverseBindPose * ComponentSpaceTransforms[i];
 	}
+
+	// 스키닝한 정점으로 바운드를 다시 잰다. 바인드 포즈 바운드 그대로면 뼈를 멀리 옮겼을 때 메시가 컬링된다
+	FVector BoundsMin(FLT_MAX, FLT_MAX, FLT_MAX);
+	FVector BoundsMax(-FLT_MAX, -FLT_MAX, -FLT_MAX);
 
 	// Linear Blend Skinning: 정점 하나당 최대 4개 뼈의 결과를 가중치로 섞는다
 	for (int32 v = 0; v < Data.Vertices.Num(); v++)
@@ -83,7 +87,16 @@ void FSkeletalMeshObject::Update(const TArray<FMatrix>& ComponentSpaceTransforms
 		Dst.Normal = Normal.GetSafeNormal();
 		const FVector T = Tangent.GetSafeNormal();
 		Dst.Tangent = FVector4(T.X, T.Y, T.Z, Src.Tangent.W);   // W(손잡이)는 그대로
+
+		BoundsMin = FVector(std::min(BoundsMin.X, Position.X), std::min(BoundsMin.Y, Position.Y), std::min(BoundsMin.Z, Position.Z));
+		BoundsMax = FVector(std::max(BoundsMax.X, Position.X), std::max(BoundsMax.Y, Position.Y), std::max(BoundsMax.Z, Position.Z));
 	}
+
+	FLODSphere Sphere;
+	Sphere.Center = (BoundsMin + BoundsMax) * 0.5f;
+	const FVector HalfExtent = (BoundsMax - BoundsMin) * 0.5f;
+	Sphere.RadiusSquared = HalfExtent.Dot(HalfExtent);
+	SetRenderBounds(FBox{ BoundsMin, BoundsMax }, Sphere);
 
 	// 정점 버퍼 통째로 덮어쓰기 (Map WRITE_DISCARD)
 	RenderCommand::UpdateBufferData(VertexBuffer.get(), SkinnedVertices.GetData(),

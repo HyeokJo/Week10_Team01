@@ -60,6 +60,8 @@ protected:
 	// 바운드를 바꾸고, 섹션 캐시를 비우고, 프록시에게 알린다. 정점·섹션·LOD 구성이 바뀐 뒤 부른다
 	// (스키닝처럼 정점 "값"만 바뀌고 구성은 그대로면 부르지 않는다)
 	void SetRenderData(const FBox& Bounds, const FLODSphere& Sphere);
+	// 바운드만 바꾼다. 스키닝처럼 구성은 그대로이고 모양만 달라질 때 쓴다 (섹션 캐시는 유지)
+	void SetRenderBounds(const FBox& Bounds, const FLODSphere& Sphere);
 
 private:
 	static inline uint16 NextSortID = 0;

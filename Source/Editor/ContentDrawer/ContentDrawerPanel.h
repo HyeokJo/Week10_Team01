@@ -21,6 +21,10 @@ public:
 	{
 		OpenLevelSequence = std::move(InOpenLevelSequence);
 	}
+	void SetOpenFbxBinding(std::function<void(const FString&)> InOpenFbx)
+	{
+		OpenFbx = std::move(InOpenFbx);
+	}
 
 private:
 	// 현재 폴더를 Assets > A > B 형태로 그린다. 조각을 누르면 그 폴더로 이동한다.
@@ -31,6 +35,7 @@ private:
 	fs::path CurrentPath = "Assets";
 	FString CreateAssetError;
 	std::function<void(const FString&)> OpenLevelSequence;
+	std::function<void(const FString&)> OpenFbx;
 
 	UTexture2D* FolderIcon = nullptr;
 	UTexture2D* FileIcon = nullptr;

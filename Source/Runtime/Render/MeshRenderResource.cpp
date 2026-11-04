@@ -27,6 +27,14 @@ void FMeshRenderResource::SetRenderData(const FBox& Bounds, const FLODSphere& Sp
 		Proxy->OnMeshRenderDataChanged();
 }
 
+void FMeshRenderResource::SetRenderBounds(const FBox& Bounds, const FLODSphere& Sphere)
+{
+	RenderBounds = Bounds;
+	LocalLODSphere = Sphere;
+	for (FPrimitiveSceneProxy* Proxy : RenderProxies)
+		Proxy->OnMeshBoundsChanged();
+}
+
 TSharedPtr<const FMeshRenderState> FMeshRenderResource::GetRenderState(const std::vector<UMaterial*>& Materials)
 {
 	auto& WeakState = RenderStates[Materials];

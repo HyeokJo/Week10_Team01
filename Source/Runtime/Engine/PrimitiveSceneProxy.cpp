@@ -19,6 +19,14 @@ void FPrimitiveSceneProxy::OnMeshRenderDataChanged()
     }
 }
 
+void FPrimitiveSceneProxy::OnMeshBoundsChanged()
+{
+    if (Scene)
+    {
+        Scene->MarkDirty(this);
+    }
+}
+
 void FPrimitiveSceneProxy::OnMeshDestroyed()
 {
     Mesh = nullptr;

@@ -1,0 +1,333 @@
+{
+    "Version": 4,
+    "World": {
+        "PersistentLevel": {
+            "Actors": [
+                {
+                    "Class": "ASkeletalMeshActor",
+                    "Components": [
+                        {
+                            "Class": "USceneComponent",
+                            "Name": "DefaultSceneRoot",
+                            "Parent": "",
+                            "Properties": {
+                                "Transform": {
+                                    "Location": {
+                                        "X": 0.0,
+                                        "Y": 0.0,
+                                        "Z": 0.0
+                                    },
+                                    "Rotation": {
+                                        "Pitch": 0.0,
+                                        "Roll": 0.0,
+                                        "Yaw": 0.0
+                                    },
+                                    "Scale": {
+                                        "X": 1.0,
+                                        "Y": 1.0,
+                                        "Z": 1.0
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "Class": "USkeletalMeshComponent",
+                            "Name": "USkeletalMeshComponent",
+                            "OverrideMaterials": [],
+                            "Parent": "",
+                            "Properties": {
+                                "ShowBeginOverlapLog": false,
+                                "ShowEndOverlapLog": false,
+                                "ShowHitLog": false,
+                                "SkeletalMesh": "Models/StylizedMale/SM_StylizedMale_UE.fbx",
+                                "Transform": {
+                                    "Location": {
+                                        "X": 0.0,
+                                        "Y": 0.0,
+                                        "Z": 0.0
+                                    },
+                                    "Rotation": {
+                                        "Pitch": 0.0,
+                                        "Roll": 0.0,
+                                        "Yaw": 0.0
+                                    },
+                                    "Scale": {
+                                        "X": 1.0,
+                                        "Y": 1.0,
+                                        "Z": 1.0
+                                    }
+                                },
+                                "bBlockComponet": false,
+                                "bCastShadow": true,
+                                "bGenerateOverlapEvents": true,
+                                "bReceiveShadow": true,
+                                "bVisible": true
+                            }
+                        }
+                    ],
+                    "Name": "ASkeletalMeshActor_0",
+                    "Properties": {},
+                    "RootComponent": "USkeletalMeshComponent"
+                },
+                {
+                    "Class": "ADirectionalLightActor",
+                    "Components": [
+                        {
+                            "Class": "USceneComponent",
+                            "Name": "DefaultSceneRoot",
+                            "Parent": "",
+                            "Properties": {
+                                "Transform": {
+                                    "Location": {
+                                        "X": 0.0,
+                                        "Y": 0.0,
+                                        "Z": 0.0
+                                    },
+                                    "Rotation": {
+                                        "Pitch": 0.0,
+                                        "Roll": 0.0,
+                                        "Yaw": 0.0
+                                    },
+                                    "Scale": {
+                                        "X": 1.0,
+                                        "Y": 1.0,
+                                        "Z": 1.0
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UDirectionalLightComponent",
+                            "Name": "UDirectionalLightComponent",
+                            "Parent": "",
+                            "Properties": {
+                                "Intensity": 1.0,
+                                "LightColor": {
+                                    "A": 255,
+                                    "B": 255,
+                                    "G": 255,
+                                    "R": 255
+                                },
+                                "OrthoWidth": 2000.0,
+                                "ShadowBias": 0.0010000000474974513,
+                                "ShadowNormalBias": 2.0,
+                                "ShadowResolution": 2048,
+                                "Transform": {
+                                    "Location": {
+                                        "X": 1.9502873420715332,
+                                        "Y": 3.473015069961548,
+                                        "Z": 4.813018798828125
+                                    },
+                                    "Rotation": {
+                                        "Pitch": 46.0,
+                                        "Roll": 0.0,
+                                        "Yaw": 180.0
+                                    },
+                                    "Scale": {
+                                        "X": 1.0,
+                                        "Y": 1.0,
+                                        "Z": 1.0
+                                    }
+                                },
+                                "bCastShadows": true,
+                                "bVisible": true
+                            }
+                        },
+                        {
+                            "Class": "UBillboardComponent",
+                            "Material": {
+                                "Base": "BillboardMaterial",
+                                "Instance": {
+                                    "BaseColor": {
+                                        "A": 1.0,
+                                        "B": 1.0,
+                                        "G": 1.0,
+                                        "R": 1.0
+                                    },
+                                    "BlendState": "AlphaBlend",
+                                    "Properties": {},
+                                    "SamplerState": "LinearClamp",
+                                    "Shininess": 32.0,
+                                    "SpecularColor": {
+                                        "A": 1.0,
+                                        "B": 0.5,
+                                        "G": 0.5,
+                                        "R": 0.5
+                                    },
+                                    "Textures": [
+                                        "Resources/Icons/S_LightDirectional.png"
+                                    ],
+                                    "UVScrollSpeed": [
+                                        0.0,
+                                        0.0
+                                    ],
+                                    "bFlipNormalGreen": false
+                                }
+                            },
+                            "Name": "UBillboardComponent",
+                            "Parent": "UDirectionalLightComponent",
+                            "Properties": {
+                                "ShowBeginOverlapLog": false,
+                                "ShowEndOverlapLog": false,
+                                "ShowHitLog": false,
+                                "Transform": {
+                                    "Location": {
+                                        "X": 0.0,
+                                        "Y": 0.0,
+                                        "Z": 0.0
+                                    },
+                                    "Rotation": {
+                                        "Pitch": 0.0,
+                                        "Roll": 0.0,
+                                        "Yaw": 0.0
+                                    },
+                                    "Scale": {
+                                        "X": 1.0,
+                                        "Y": 1.0,
+                                        "Z": 1.0
+                                    }
+                                },
+                                "bBlockComponet": false,
+                                "bCastShadow": true,
+                                "bGenerateOverlapEvents": true,
+                                "bReceiveShadow": true,
+                                "bVisible": true
+                            }
+                        }
+                    ],
+                    "Name": "ADirectionalLightActor_0",
+                    "Properties": {},
+                    "RootComponent": "UDirectionalLightComponent"
+                },
+                {
+                    "Class": "AAmbientLightActor",
+                    "Components": [
+                        {
+                            "Class": "USceneComponent",
+                            "Name": "DefaultSceneRoot",
+                            "Parent": "",
+                            "Properties": {
+                                "Transform": {
+                                    "Location": {
+                                        "X": 0.0,
+                                        "Y": 0.0,
+                                        "Z": 0.0
+                                    },
+                                    "Rotation": {
+                                        "Pitch": 0.0,
+                                        "Roll": 0.0,
+                                        "Yaw": 0.0
+                                    },
+                                    "Scale": {
+                                        "X": 1.0,
+                                        "Y": 1.0,
+                                        "Z": 1.0
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UAmbientLightComponent",
+                            "Name": "UAmbientLightComponent",
+                            "Parent": "",
+                            "Properties": {
+                                "Intensity": 0.4000000059604645,
+                                "LightColor": {
+                                    "A": 255,
+                                    "B": 255,
+                                    "G": 255,
+                                    "R": 255
+                                },
+                                "Transform": {
+                                    "Location": {
+                                        "X": 1.9502873420715332,
+                                        "Y": 3.473015069961548,
+                                        "Z": 4.813018798828125
+                                    },
+                                    "Rotation": {
+                                        "Pitch": 0.0,
+                                        "Roll": 0.0,
+                                        "Yaw": 0.0
+                                    },
+                                    "Scale": {
+                                        "X": 1.0,
+                                        "Y": 1.0,
+                                        "Z": 1.0
+                                    }
+                                },
+                                "bCastShadows": true,
+                                "bVisible": true
+                            }
+                        },
+                        {
+                            "Class": "UBillboardComponent",
+                            "Material": {
+                                "Base": "BillboardMaterial",
+                                "Instance": {
+                                    "BaseColor": {
+                                        "A": 1.0,
+                                        "B": 1.0,
+                                        "G": 1.0,
+                                        "R": 1.0
+                                    },
+                                    "BlendState": "AlphaBlend",
+                                    "Properties": {},
+                                    "SamplerState": "LinearClamp",
+                                    "Shininess": 32.0,
+                                    "SpecularColor": {
+                                        "A": 1.0,
+                                        "B": 0.5,
+                                        "G": 0.5,
+                                        "R": 0.5
+                                    },
+                                    "Textures": [
+                                        "Resources/Icons/SkyLight.png"
+                                    ],
+                                    "UVScrollSpeed": [
+                                        0.0,
+                                        0.0
+                                    ],
+                                    "bFlipNormalGreen": false
+                                }
+                            },
+                            "Name": "UBillboardComponent",
+                            "Parent": "UAmbientLightComponent",
+                            "Properties": {
+                                "ShowBeginOverlapLog": false,
+                                "ShowEndOverlapLog": false,
+                                "ShowHitLog": false,
+                                "Transform": {
+                                    "Location": {
+                                        "X": 0.0,
+                                        "Y": 0.0,
+                                        "Z": 0.0
+                                    },
+                                    "Rotation": {
+                                        "Pitch": 0.0,
+                                        "Roll": 0.0,
+                                        "Yaw": 0.0
+                                    },
+                                    "Scale": {
+                                        "X": 1.0,
+                                        "Y": 1.0,
+                                        "Z": 1.0
+                                    }
+                                },
+                                "bBlockComponet": false,
+                                "bCastShadow": true,
+                                "bGenerateOverlapEvents": true,
+                                "bReceiveShadow": true,
+                                "bVisible": true
+                            }
+                        }
+                    ],
+                    "Name": "AAmbientLightActor_0",
+                    "Properties": {},
+                    "RootComponent": "UAmbientLightComponent"
+                }
+            ],
+            "Properties": {}
+        },
+        "Properties": {}
+    }
+}

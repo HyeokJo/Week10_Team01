@@ -25,6 +25,9 @@ bool FLineBatcher::Init(FRenderer* InRenderer, UWorld* InWorld)
 
 	ForegroundPipelineState = PipelineState;
 	ForegroundPipelineState.DepthStencilState = EDepthStencilState::Disabled;
+	// 1픽셀 선은 완만한 기울기에서 계단끼리 모서리로만 닿아 점선처럼 보인다
+	ForegroundPipelineState.RasterizerState = ERasterizerState::AntialiasedLine;
+	ForegroundPipelineState.BlendState = EBlendState::AlphaBlend;
 
 	MaxVertices = 65536;
 	VertexBufferBase = new FVertex[MaxVertices];
@@ -231,6 +234,9 @@ void FLineBatcher::OnRender(const FMatrix& ViewProjection)
 		RenderCommand::BindVertexBuffer(VertexBuffer.get());
 		RenderCommand::BindConstantBuffer(0, CB.get(), EShaderBindFlagBits::Vertex);
 		RenderCommand::Draw(ForegroundCount, NormalCount);   // 두 번째 인자 = 시작 정점
+		// 뒤이은 에디터 표시가 이 상태를 물려받지 않게 기본값으로 돌린다
+		RenderCommand::SetRasterizerState(ERasterizerState::SolidBack);
+		RenderCommand::SetBlendState(EBlendState::Opaque);
 	}
 }
 
