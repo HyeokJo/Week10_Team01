@@ -648,7 +648,7 @@ void UEditorEngine::RenderSkeletalMeshViewer(const FSceneRenderSettings& Setting
 	Adapter.BuildRenderQueue(ViewIndex, RenderQueue);
 
 	const FSceneView SceneView = MakeSceneView(Adapter, ViewIndex);
-	RenderFrame(SceneView, Settings, *ViewWorld, Targets.SceneInfo, Targets.ViewInfo, Targets.FxaaTemp.get(), RenderQueue);
+	RenderFrame(SceneView, Settings, *ViewWorld, Targets.SceneInfo, Targets.ViewInfo, Targets.FxaaTemp.get(), nullptr, nullptr, RenderQueue);
 	RenderOverlayPass(Adapter, ViewIndex, *ViewWorld, Targets.ViewInfo, SceneView.ViewProjection, SceneView.Location, SceneView.Forward, RenderQueue);
 
 	ViewWorld->GetScene().ClearShadowDirty();
