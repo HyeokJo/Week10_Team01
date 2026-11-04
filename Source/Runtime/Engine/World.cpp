@@ -693,7 +693,8 @@ bool UWorld::LineTraceSingle(const FRay& WorldRay, FHitResult& OutHit,
 
 			UPrimitiveComponent* Component = Proxy ? Proxy->GetComponent() : nullptr;
 
-			if (!Component || !Component->IsVisible())
+			// 컴포넌트는 켜져 있어도 프록시가 숨길 수 있다 (스켈레탈 ShowFlag). 스켈레탈은 BVH가 없어 이 경로로 온다
+			if (!Component || !Component->IsVisible() || !Proxy->IsVisible())
 				return false;
 
 			if (UBillboardComponent* Billboard = Cast<UBillboardComponent>(Component))

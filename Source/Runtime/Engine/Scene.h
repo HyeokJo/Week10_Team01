@@ -50,6 +50,10 @@ public:
 	void MarkDirty(FPrimitiveSceneProxy* Proxy);
 	void MarkRenderStateDirty(FPrimitiveSceneProxy* Proxy);
 
+	// ShowFlag. 끄면 스켈레탈 메시 프록시의 IsVisible이 false가 되어 렌더·그림자·오클루전·피킹에서 함께 빠진다
+	void SetShowSkeletalMeshes(bool bInShow);
+	bool ShouldShowSkeletalMeshes() const { return bShowSkeletalMeshes; }
+
 	bool IsFrustemCulling(const FLightSceneProxy* Proxy, const FFrustumPlanes* FrustemPlanes) const;
 	bool TryGetLightBounds(const FLightSceneProxy* Proxy, FAABB &OUT) const;
 
@@ -106,4 +110,5 @@ private:
 	TArray<FDecalSceneProxy*> DecalProxies;
 	TBVH<FDecalSceneProxy*> DecalBVH;
 	bool bDecalElementListChanged = false;
+	bool bShowSkeletalMeshes = true;
 };

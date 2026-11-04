@@ -1,6 +1,7 @@
 #include "EnginePCH.h"
 #include "PrimitiveSceneProxy.h"
 #include "Component/PrimitiveComponent.h"
+#include "Component/SkinnedMeshComponent.h"
 #include "Render/MeshRenderResource.h"
 #include "Render/Renderer.h"
 #include "Engine/Scene.h"
@@ -49,6 +50,11 @@ void FPrimitiveSceneProxy::UpdateRenderState()
     Mesh = nullptr;
     RenderState.reset();
     bVisible = Component->IsVisible();
+    // 렌더·그림자·오클루전·피킹이 모두 이 값을 보므로 ShowFlag를 여기서 한 번만 반영한다
+    if (Scene && !Scene->ShouldShowSkeletalMeshes() && Cast<USkinnedMeshComponent>(Component))
+    {
+        bVisible = false;
+    }
     bCastShadow = Component->IsCastShadow();
     bReceiveShadow = Component->IsReceiveShadow();
 	bReceiveDecal = Component->IsReceiveDecal();

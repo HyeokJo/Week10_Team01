@@ -458,6 +458,10 @@ void UEditorEngine::TickWorldAndEditor(const float DeltaTime)
 	}
 	// 라이트 프록시가 아래 UpdateAllTransforms에서 바뀐 작업 흐름으로 다시 계산되도록 먼저 반영한다.
 	ColorWorkflow::bLinear = SettingsPanel->GetSettings().bLinearWorkflow;
+	// 프리뷰 월드에는 넘기지 않는다. 뷰어는 메시를 보려고 여는 창이라 레벨의 Show 설정을 따르지 않는다.
+	EditorWorld->GetScene().SetShowSkeletalMeshes(SettingsPanel->GetSettings().bShowSkeletalMeshes);
+	if (PlayWorld)
+		PlayWorld->GetScene().SetShowSkeletalMeshes(SettingsPanel->GetSettings().bShowSkeletalMeshes);
 	// 월드 캡처는 View마다 그릴 월드가 다르므로 RenderMultipleViewports에서 한다.
 	// PIE 중에도 PIE가 아닌 View에서는 EditorWorld 편집을 계속한다.
 	UpdateGizmoAndPicking();
@@ -917,8 +921,8 @@ void UEditorEngine::RenderOverlayPass(const FMultipleViewportsAdapter& Adapter, 
 		return Component && Component->GetOwner() && Component->GetOwner()->GetWorld() == &ViewWorld;
 	};
 
-	// 스텐실 기반이라 선택 대상의 가시성이 꺼져 있어도 외곽선만 그린다.
-	if (bShowEditorOverlay)
+	// 스텐실 기반이라 선택 대상의 가시성이 꺼져 있어도 외곽선만 그린다. 단 Show 설정으로 숨긴 물체는 외곽선도 뺀다.
+	if (bShowEditorOverlay && Settings.bDrawPrimitives)
 	{
 		OutlineRenderer->OnRender(*Outline, ViewProjection, PassInfo.ViewportSetting, &ViewWorld);
 	}
