@@ -161,7 +161,10 @@ void FSceneRenderer::Render(UWorld& World, const FSceneView& SceneView, const FS
 	FStatOverlay::SetShadowStats(ShadowStats);
 
 	// 1. 불투명·반투명 Pass (Linear 씬 컬러)
-	RenderOpaquePass(SceneView, Settings, World, SceneInfo, RenderQueue, Lighting.Directional, DecalBaseColorTarget, DecalNormalTarget, FrustumPlanes);
+	// ViewColor is not needed for display until gamma encoding, after all decals have read the normals.
+	FTexture2D* ReceiverNormals = ViewInfo.ColorRenderTargets[0].Texture;
+	const bool bHasReceiverNormals = RenderOpaquePass(SceneView, Settings, World, SceneInfo, RenderQueue, Lighting.Directional,
+		DecalBaseColorTarget, DecalNormalTarget, FrustumPlanes, ReceiverNormals);
 
 	// 데이터 시각화 뷰는 씬 컬러 값 자체가 결과이므로 안개·인코딩·FXAA로 값을 바꾸지 않는다.
 	const EViewMode ViewMode = SceneView.RenderMode.ViewMode;
@@ -174,7 +177,8 @@ void FSceneRenderer::Render(UWorld& World, const FSceneView& SceneView, const FS
 	if (bCanRenderUnlitDecals)
 	{
 		FTexture2D* SceneColorTarget = SceneInfo.ColorRenderTargets[0].Texture;
-		RenderScreenSpaceDecalPass(SceneView, Settings, World, SceneInfo, SceneColorTarget, nullptr, FrustumPlanes, true);
+		RenderScreenSpaceDecalPass(SceneView, Settings, World, SceneInfo, SceneColorTarget, nullptr, FrustumPlanes, true,
+			bHasReceiverNormals ? ReceiverNormals : nullptr);
 	}
 
 	RenderTranslucentPass(SceneView, Settings, World, SceneInfo);
@@ -202,9 +206,10 @@ void FSceneRenderer::Render(UWorld& World, const FSceneView& SceneView, const FS
 	}
 }
 
-void FSceneRenderer::RenderOpaquePass(const FSceneView& SceneView, const FSceneRenderSettings& Settings, const UWorld& ViewWorld,
+bool FSceneRenderer::RenderOpaquePass(const FSceneView& SceneView, const FSceneRenderSettings& Settings, const UWorld& ViewWorld,
 									const FRenderingInfo& SceneInfo, FRenderQueue& RenderQueue, const FDirectionalLightInfo& DirectionalLight,
-									FTexture2D* DecalBaseColorTarget, FTexture2D* DecalNormalTarget, const FFrustumPlanes& FrustumPlanes)
+									FTexture2D* DecalBaseColorTarget, FTexture2D* DecalNormalTarget, const FFrustumPlanes& FrustumPlanes,
+									FTexture2D* ReceiverNormals)
 {
 	const FViewRenderMode ViewRenderMode = SceneView.RenderMode;
 
@@ -213,9 +218,13 @@ void FSceneRenderer::RenderOpaquePass(const FSceneView& SceneView, const FSceneR
 
 	const auto& Decals = ViewWorld.GetScene().GetDecalProxies();
 
-	const bool bUseDecals = (ViewRenderMode.ViewMode == EViewMode::Lit || ViewRenderMode.ViewMode == EViewMode::Unlit) &&
-		Settings.DecalRenderMode == EDecalRenderMode::ScreenSpace && Settings.bDrawDecals && !Settings.bDepthView && !IsDataVisualization(ViewRenderMode.ViewMode) &&
+	const bool bCanRenderDecals = (ViewRenderMode.ViewMode == EViewMode::Lit || ViewRenderMode.ViewMode == EViewMode::Unlit) &&
+		Settings.bDrawDecals && !Settings.bDepthView && !IsDataVisualization(ViewRenderMode.ViewMode) &&
 		!Settings.bVisualizeCascades && !Settings.bVisualizeTileLightCount && bDrawPrimitives && !Decals.IsEmpty() && DecalBaseColorTarget != nullptr;
+	const bool bUseDecals = bCanRenderDecals && Settings.DecalRenderMode == EDecalRenderMode::ScreenSpace;
+	const bool bUseNormalPrepass = bCanRenderDecals && (bUseDecals ||
+		std::any_of(Decals.begin(), Decals.end(), [](const FDecalSceneProxy* Decal)
+			{ return Decal->IsRenderAsUnlit() && Decal->GetOpacity() > 0.f; }));
 
 	const ERasterizerState SceneRasterizerState = ViewRenderMode.ViewMode == EViewMode::Wireframe ? ERasterizerState::Wireframe : ERasterizerState::SolidBack;
 
@@ -237,14 +246,14 @@ void FSceneRenderer::RenderOpaquePass(const FSceneView& SceneView, const FSceneR
 		Renderer->RenderQueueSorting(RenderQueue, SceneView.ViewProjection, SceneView.Location);
 	}
 
-	if (bUseDecals)
+	if (bUseNormalPrepass)
 	{
 		FRenderingInfo DepthPassInfo = SceneInfo;
-
-		for (FRenderingDesc& Color : DepthPassInfo.ColorRenderTargets)
-		{
-			Color.LoadOp = ERenderTargetLoadOp::Load;
-		}
+		DepthPassInfo.ColorRenderTargets.Reset();
+		FRenderingDesc Normal{};
+		Normal.Texture = ReceiverNormals;
+		Normal.ClearValue.ColorClearValue = FVector4(0.f, 0.f, 0.f, 0.f);
+		DepthPassInfo.ColorRenderTargets.Add(Normal);
 
 		DepthPassInfo.DepthStencil.LoadOp = ERenderTargetLoadOp::Clear;
 
@@ -260,7 +269,7 @@ void FSceneRenderer::RenderOpaquePass(const FSceneView& SceneView, const FSceneR
 		RenderCommand::SetDepthStencilState(EDepthStencilState::Default);
 
 		FViewRenderMode DepthMode = ViewRenderMode;
-		DepthMode.ViewMode = EViewMode::Unlit;
+		DepthMode.ViewMode = EViewMode::WorldNormal;
 
 		Renderer->SetViewMode(DepthMode);
 
@@ -269,12 +278,16 @@ void FSceneRenderer::RenderOpaquePass(const FSceneView& SceneView, const FSceneR
 		Renderer->RenderOpaque(SceneView.ViewProjection);
 
 		RenderCommand::EndRenderPass();
+	}
 
+	if (bUseDecals)
+	{
 		const bool bHasNormalDecals = ViewRenderMode.ViewMode == EViewMode::Lit &&
 			std::any_of(Decals.begin(), Decals.end(), [](const FDecalSceneProxy* Decal)
 				{ return !Decal->IsRenderAsUnlit() && Decal->GetNormalTexture() && Decal->GetOpacity() > 0.f; });
 		FTexture2D* NormalTarget = bHasNormalDecals ? DecalNormalTarget : nullptr;
-		RenderScreenSpaceDecalPass(SceneView, Settings, ViewWorld, SceneInfo, DecalBaseColorTarget, NormalTarget, FrustumPlanes, false);
+		RenderScreenSpaceDecalPass(SceneView, Settings, ViewWorld, SceneInfo, DecalBaseColorTarget, NormalTarget, FrustumPlanes, false,
+			ReceiverNormals);
 
 		Renderer->BindShadowForShading();
 
@@ -287,7 +300,7 @@ void FSceneRenderer::RenderOpaquePass(const FSceneView& SceneView, const FSceneR
 
 	PassInfo.ColorRenderTargets[0].ClearValue.ColorClearValue = FVector4(ClearValue, ClearValue, ClearValue, 1.0f);
 
-	if (bUseDecals)
+	if (bUseNormalPrepass)
 	{
 		PassInfo.DepthStencil.LoadOp = ERenderTargetLoadOp::Load;
 	}
@@ -306,7 +319,7 @@ void FSceneRenderer::RenderOpaquePass(const FSceneView& SceneView, const FSceneR
 		RenderCommand::SetDepthStencilState(EDepthStencilState::Default);
 		RenderCommand::SetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 		Renderer->SetViewMode(ViewRenderMode);
-		Renderer->SetOpaquePassMode(bUseDecals ? EOpaquePassMode::DepthReadOnly : EOpaquePassMode::Normal);
+		Renderer->SetOpaquePassMode(bUseNormalPrepass ? EOpaquePassMode::DepthReadOnly : EOpaquePassMode::Normal);
 		Renderer->RenderOpaque(SceneView.ViewProjection);
 		RenderReceiverDecalPass(SceneView, Settings, ViewWorld);
 		DrawWorldText(SceneView, ViewWorld);
@@ -315,6 +328,7 @@ void FSceneRenderer::RenderOpaquePass(const FSceneView& SceneView, const FSceneR
 
 	RenderCommand::EndRenderPass();
 	Renderer->SetDecalTextures(nullptr, nullptr);
+	return bUseNormalPrepass;
 }
 
 void FSceneRenderer::DrawWorldText(const FSceneView& SceneView, const UWorld& ViewWorld)
@@ -456,7 +470,8 @@ void FSceneRenderer::RenderReceiverDecalPass(const FSceneView& SceneView, const 
 }
 
 void FSceneRenderer::RenderScreenSpaceDecalPass(const FSceneView& SceneView, const FSceneRenderSettings& Settings, const UWorld& ViewWorld,
-    const FRenderingInfo& SceneInfo, FTexture2D* OutputTarget, FTexture2D* NormalTarget, const FFrustumPlanes& FrustumPlanes, bool bRenderAsUnlit)
+    const FRenderingInfo& SceneInfo, FTexture2D* OutputTarget, FTexture2D* NormalTarget, const FFrustumPlanes& FrustumPlanes, bool bRenderAsUnlit,
+    FTexture2D* ReceiverNormals)
 {
     if (!Settings.bDrawDecals || !Settings.bDrawPrimitives || !OutputTarget || !ScreenSpaceDecalRenderer)
         return;
@@ -481,13 +496,13 @@ void FSceneRenderer::RenderScreenSpaceDecalPass(const FSceneView& SceneView, con
     PassInfo.DepthStencil.Texture = nullptr;
     RenderCommand::BeginRenderPass(PassInfo);
     ScreenSpaceDecalRenderer->OnRender(SceneInfo.DepthStencil.Texture, SceneView.ViewProjection, Decals,
-        SceneInfo.ViewportSetting, SceneView.bOrthographic, NormalTarget != nullptr);
+        SceneInfo.ViewportSetting, SceneView.bOrthographic, NormalTarget != nullptr, ReceiverNormals);
     RenderCommand::EndRenderPass();
     RenderCommand::SetRasterizerState(ERasterizerState::SolidBack);
     RenderCommand::UnbindShaderResource(0, EShaderBindFlagBits::Pixel);
     RenderCommand::UnbindShaderResource(1, EShaderBindFlagBits::Pixel);
     RenderCommand::UnbindShaderResource(2, EShaderBindFlagBits::Pixel);
-    // The SSD stencil SRV uses the shadow array's t2 slot.
+    // SSD receiver inputs use the shadow textures' t2/t3 slots.
     Renderer->BindShadowForShading();
     FStatOverlay::AddDecalCPUTime(FPlatformTime::ToMilliseconds64(FPlatformTime::GetCycles64() - Start));
 }

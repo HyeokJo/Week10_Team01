@@ -153,7 +153,8 @@ void FRenderer::ApplyOpaquePassState(const UMaterial* Material, const FPrimitive
 			return;
 		}
 
-		RenderCommand::SetBlendState(EBlendState::NoColorWrite);
+		RenderCommand::SetBlendState(Material->ParamLayout == EMaterialParamLayout::StaticMesh
+			? EBlendState::Opaque : EBlendState::NoColorWrite);
 		if (Material->DepthStencilState == EDepthStencilState::Default)
 		{
 			const bool bReceiveDecal = Proxy ? Proxy->IsReceiveDecal() : true;
@@ -623,7 +624,9 @@ void FRenderer::BindMaterial(UMaterial* material, bool bReceiveShadow)
 		if (!ViewModeShaders[0][1])
 			SetViewMode(FViewRenderMode{});
 
-		bool bUseNormalMap = material->Textures.size() > 1 && material->Textures[1] != nullptr;
+		// The SSD prepass stores interpolated receiver normals, without material normal-map detail.
+		bool bUseNormalMap = OpaquePassMode != EOpaquePassMode::DepthPrepass &&
+			material->Textures.size() > 1 && material->Textures[1] != nullptr;
 		if (bUseNormalMap)
 		{
 			RenderCommand::BindShaderProgram(ViewModeShaders[1][bReceiveShadow ? 1 : 0]);

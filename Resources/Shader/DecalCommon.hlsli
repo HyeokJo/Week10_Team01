@@ -39,10 +39,13 @@ float3 ApplyDecalNormalSlope(float3 BaseNormal, float3 GeoNormal, float4 SlopeAn
 float ComputeDecalAngleFade(float3 NormalWS, float3 ProjectionDirection, float2 FadeCosines)
 {
     float LengthSq = dot(NormalWS, NormalWS);
-    // No reliable depth tangent at a viewport edge or on a subpixel surface.
+    // No reliable normal means there is no front-facing receiver to establish.
     if (LengthSq <= 1e-30f)
-        return 1.0f;
-    float Alignment = abs(dot(NormalWS, ProjectionDirection)) * rsqrt(LengthSq);
+        return 0.0f;
+    // The receiver normal must oppose the direction the decal projects into the surface.
+    float Alignment = -dot(NormalWS, ProjectionDirection) * rsqrt(LengthSq);
+    if (Alignment <= 0.0f)
+        return 0.0f;
     return smoothstep(FadeCosines.x, FadeCosines.y, Alignment);
 }
 
