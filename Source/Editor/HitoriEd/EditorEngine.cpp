@@ -39,6 +39,7 @@
 #include "GameFramework/PlayerController.h"
 
 #include "Component/ShapeComponent.h"
+#include "Component/SkeletalMeshDebugComponent.h"
 #include "Engine/GameViewportClient.h"
 
 namespace
@@ -428,6 +429,8 @@ void UEditorEngine::TickWorldAndEditor(const float DeltaTime)
 			FLuaScriptSystem::Get().Update(GameDeltaTime);
 		}
 
+		// PIE 일시정지와 무관하게 뷰어 편집은 반영한다
+		SkeletalMeshViewer.Tick(DeltaTime);
 	}
 	{
 		SCOPE_CYCLE_COUNTER(STAT_EditorTick);
@@ -726,6 +729,15 @@ void UEditorEngine::RenderOverlayPass(const int32 ViewIndex, UWorld& ViewWorld, 
 				continue;
 			if (Selection.IsSelected(Owner) || LocalLight->ShouldAlwaysDrawDebug())
 				LocalLight->DrawDebug(LineBatcher.get());
+		}
+		// 스켈레탈 메시의 뼈 (관절 연결선 + 축)
+		for (TObjectIterator<USkeletalMeshDebugComponent> SkeletalDebug; SkeletalDebug; ++SkeletalDebug)
+		{
+			AActor* Owner = SkeletalDebug->GetOwner();
+			if (!Owner || Owner->GetWorld() != &ViewWorld)
+				continue;
+			if (SkeletalDebug->IsVisible() && SkeletalDebug->ShouldDrawDebug())
+				SkeletalDebug->DrawDebug(LineBatcher.get());
 		}
 	}
 
@@ -1135,6 +1147,7 @@ void UEditorEngine::PreExit()
 {
 	// PIE 창이 열린 채 종료하면 Device가 살아 있을 때 Swapchain과 타깃을 먼저 정리한다.
 	DestroyPIEWindow();
+	SkeletalMeshViewer.Close();
 	ImGuiRenderer->Shutdown();
 }
 

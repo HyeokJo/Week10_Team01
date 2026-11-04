@@ -156,8 +156,8 @@ void UWorld::Tick(float DeltaTime)
 		Scene.UpdateAllTransforms();
 	}
 
-	// 에디터 월드면 더이상 틱을 돌리지 않는다.
-	if (WorldType != EWorldType::Editor)
+	// 에디터·프리뷰 월드면 더이상 틱을 돌리지 않는다.
+	if (!IsEditorOnlyWorld())
 	{
 		//인덱스 for 문 사용 : PostInitializeComponent에서 Spawn하게 될 때 범위 for문이 깨진다
 		for (int32 i = 0; i < NewActorList.Num(); ++i)
@@ -245,7 +245,7 @@ void UWorld::GatherRenderPackets(FRenderQueue& RenderQueue, const FLODViewContex
 		SCOPE_CYCLE_COUNTER(STAT_FrustumCull);
 
 		// 컬링 단계에서는 프록시 포인터만 모으고, 컴포넌트 역참조(가시성 확인)는 어차피 컴포넌트를 읽는 Gather로 미룬다.
-		const bool bGameView = WorldType != EWorldType::Editor;
+		const bool bGameView = !IsEditorOnlyWorld();
 		const auto Visit = [&](FPrimitiveSceneProxy* Proxy)
 		{
 			if (bGameView && Proxy->IsHiddenInGame())
@@ -346,7 +346,7 @@ void UWorld::GatherRenderPackets(FRenderQueue& RenderQueue, const FLODViewContex
 			{
 				FGatherChunk& Out = GatherChunks[ChunkIndex];      // 이 조각 전용. 다른 스레드는 절대 안 건드림
 				// (머티리얼, 메시, LOD) 묶음 찾기. 조합이 몇 개뿐이라 선형 탐색이면 충분하고, 바로 전 묶음을 먼저 본다.
-				const auto FindGroup = [&Out](UMaterial* Material, UStaticMesh* Mesh, uint8 LOD) -> FStaticDrawGroup&
+				const auto FindGroup = [&Out](UMaterial* Material, FMeshRenderResource* Mesh, uint8 LOD) -> FStaticDrawGroup&
 					{
 						if (Out.LastGroup < Out.Groups.size())
 						{
@@ -376,7 +376,7 @@ void UWorld::GatherRenderPackets(FRenderQueue& RenderQueue, const FLODViewContex
 					FPrimitiveSceneProxy* Proxy = VisibleProxies[VisibleIndex];   // 읽기만
 					if (!Proxy->IsVisible()) continue;
 
-					UStaticMesh* Mesh = Proxy->GetMesh();
+					FMeshRenderResource* Mesh = Proxy->GetMesh();
 					if (!Mesh)
 					{
 						Out.SlowPathIndices.Add(VisibleIndex);     // 컴포넌트를 건드리는 경로는 메인이 나중에
@@ -658,7 +658,9 @@ bool UWorld::LineTraceSingle(const FRay& WorldRay, FHitResult& OutHit,
 
 	const auto TraceComponent = [&](FPrimitiveSceneProxy* Proxy, float& InOutNearestT)
 		{
-			if (UStaticMesh* Mesh = Proxy ? Proxy->GetMesh() : nullptr)
+			// 자원이 CPU 삼각형(BVH)을 주면 여기서 바로 검사한다. 스켈레탈처럼 nullptr이면 아래 컴포넌트 경로로 간다
+			const FMeshRenderResource* Mesh = Proxy ? Proxy->GetMesh() : nullptr;
+			if (const FStaticMeshData* PickingData = Mesh ? Mesh->GetPickingData() : nullptr)
 			{
 				if (!Proxy->IsVisible())
 					return false;
@@ -670,7 +672,7 @@ bool UWorld::LineTraceSingle(const FRay& WorldRay, FHitResult& OutHit,
 				};
 
 				float T = InOutNearestT;
-				if (!RayIntersectsMesh(LocalRay, Mesh->GetMeshData(), T))
+				if (!RayIntersectsMesh(LocalRay, *PickingData, T))
 					return false;
 
 				OutHit.HitComponent = Proxy->GetComponent();

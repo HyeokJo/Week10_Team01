@@ -31,6 +31,7 @@
 #include "Editor/Rendering/OutLineRenderer.h"
 #include "Editor/Outliner/OutlinerPanel.h"
 #include "Editor/HitoriEd/EditorSelection.h"
+#include "Editor/SkeletalMeshViewer/SkeletalMeshViewer.h"
 
 #include "Render/SkyboxRenderer.h"
 
@@ -151,6 +152,7 @@ private:
 	FOutlinerPanel* OutlinerPanel = nullptr;
 	FContentDrawerPanel* ContentDrawerPanel = nullptr;
 	FLevelSequencePanel* LevelSequencerPanel = nullptr;
+	FSkeletalMeshViewer SkeletalMeshViewer;
 
 	UWorld* EditorWorld = nullptr;
 	UWorld* PlayWorld = nullptr;
