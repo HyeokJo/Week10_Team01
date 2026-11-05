@@ -7,6 +7,7 @@
 #include "Core/Stats/LightweightStats.h"
 
 #include "Engine/PrimitiveSceneProxy.h"
+#include "Engine/Scene.h"
 
 #include "RenderCommand.h"
 #include "RenderResourceManager.h"
@@ -19,6 +20,9 @@
 
 #include "Engine/LightSceneProxy.h"
 #include <Core/StatOverlay.h>
+
+#include "DecalRenderer.h"
+#include "Engine/DecalSceneProxy.h"
 
 DECLARE_CYCLE_STAT("Draw Render Packets", STAT_DrawRenderPackets);
 DECLARE_CYCLE_STAT("Render Queue Sorting", STAT_RenderQueueSorting);
@@ -50,7 +54,8 @@ namespace
 		if (Packet.Material->BlendState != EBlendState::Opaque)
 		{
 			const uint32 DistanceBits = std::bit_cast<uint32>(Packet.CameraToParticleDistance);
-			return (1ull << 63) | static_cast<uint64>(~DistanceBits);
+			const uint32 InvDistanceBits = ~DistanceBits;   // 하위 32비트만 반전. 먼 것이 먼저 그려진다
+			return (1ull << 63) | static_cast<uint64>(InvDistanceBits);
 		}
 
 		return (static_cast<uint64>(Packet.Material->SortID) << 47)
@@ -74,6 +79,7 @@ bool FRenderer::Init()
 	ViewCB = RenderCommand::CreateConstantBuffer(sizeof(FViewConstants));
 	ShadowViewCB = RenderCommand::CreateConstantBuffer(sizeof(FMatrix));
 	LightingCB = RenderCommand::CreateConstantBuffer(sizeof(FLightingConstants));
+	DecalCompositeCB = RenderCommand::CreateConstantBuffer(sizeof(FDecalCompositeConstants));
 	FLightingConstants LightingConstant{};
 	RenderCommand::UpdateBufferData(LightingCB.get(), &LightingConstant);
 
@@ -138,6 +144,39 @@ void FRenderer::UploadPerObjectConstants()
 	RenderCommand::Unmap(PerObjectSlotCB.get());
 }
 
+void FRenderer::ApplyOpaquePassState(const UMaterial* Material, const FPrimitiveSceneProxy* Proxy)
+{
+	if (OpaquePassMode == EOpaquePassMode::DepthPrepass)
+	{
+		if (Material->BlendState != EBlendState::Opaque)
+		{
+			return;
+		}
+
+		RenderCommand::SetBlendState(Material->ParamLayout == EMaterialParamLayout::StaticMesh
+			? EBlendState::Opaque : EBlendState::NoColorWrite);
+		if (Material->DepthStencilState == EDepthStencilState::Default)
+		{
+			const bool bReceiveDecal = Proxy ? Proxy->IsReceiveDecal() : true;
+			RenderCommand::SetDepthStencilState(EDepthStencilState::DecalReceiverMask, bReceiveDecal ? 0x80 : 0x00);
+		}
+		return;
+	}
+	if (Material->BlendState != EBlendState::Opaque || Material->DepthStencilState != EDepthStencilState::Default)
+	{
+		return;
+	}
+	if (OpaquePassMode == EOpaquePassMode::DepthReadOnly)
+	{
+		RenderCommand::SetDepthStencilState(EDepthStencilState::ReadOnlyLessEqual);
+	}
+	else
+	{
+		const bool bReceiveDecal = Proxy ? Proxy->IsReceiveDecal() : true;
+		RenderCommand::SetDepthStencilState(EDepthStencilState::DecalReceiverMask, bReceiveDecal ? 0x80 : 0x00);
+	}
+}
+
 // 불투명 우선·반투명 거리순으로 정렬해 View 행렬과 Section 범위로 그린다.
 void FRenderer::RenderAll(FRenderQueue& InQueue, const FMatrix& ViewProjection, const FVector& CameraPosition)
 {
@@ -150,6 +189,73 @@ void FRenderer::RenderOpaque(const FMatrix& ViewProjection)
 {
 	DrawStaticGroups();
 	DrawPackets(0, FirstTranslucentIndex, ViewProjection);
+	RenderCommand::SetDepthStencilState(EDepthStencilState::Default);
+	OpaquePassMode = EOpaquePassMode::Normal;
+}
+
+void FRenderer::PrepareDecalReceivers()
+{
+	// The decal shader owns b0; shared lighting uses b3-b6 and t2-t12.
+	RenderCommand::BindConstantBuffer(3, LightingCB.get(), EShaderBindFlagBits::Pixel);
+	TileLightCulling.BindForShading(LocalLight);
+	BindShadowForShading();
+
+	DecalReceivers.clear();
+	const auto AddReceiver = [&](const FRenderPacket& Receiver)
+	{
+		if(!Receiver.Proxy || !Receiver.Material || Receiver.Material->ParamLayout != EMaterialParamLayout::StaticMesh || !Receiver.Proxy->IsReceiveDecal())
+		{
+			return;
+		}
+
+		DecalReceivers[Receiver.Proxy].push_back(Receiver);
+	};
+
+	for (const FStaticDrawGroup* Group : StaticGroups)
+	{
+		for (const FStaticDrawItem& Item : Group->Items)
+		{
+			if (Item.IndexCount == 0)
+			{
+				continue;
+			}
+
+			FRenderPacket Receiver{};
+			Receiver.Proxy = Item.Proxy;
+			Receiver.Mesh = Group->Mesh;
+			Receiver.Material = Group->Material;
+			Receiver.LODIndex = Group->LODIndex;
+			Receiver.StartIndex = Item.StartIndex;
+			Receiver.IndexCount = Item.IndexCount;
+
+			AddReceiver(Receiver);
+		}
+	}
+
+	for (uint32 Index = 0; Index < FirstTranslucentIndex; ++Index)
+	{
+		const FRenderPacket& Receiver = RenderPackets[SortEntries[Index].PacketIndex];
+		AddReceiver(Receiver);
+	}
+}
+
+void FRenderer::RenderDecal(FDecalRenderer& DecalRenderer, const FScene& Scene, const FDecalSceneProxy& Decal, const FSceneView& SceneView, float ScreenFade)
+{
+	const FBox& DecalBounds = Decal.GetBounds();
+	Scene.BVH.Query(
+		[&DecalBounds](const FBox& Bounds)
+		{
+			return DecalBounds.Intersects(Bounds);
+		},
+		[&](const FPrimitiveSceneProxy* Proxy)
+		{
+			const auto Receiver = DecalReceivers.find(Proxy);
+			if (Receiver == DecalReceivers.end())
+				return;
+
+			for (const FRenderPacket& Packet : Receiver->second)
+				DecalRenderer.OnRender(Packet, Decal, SceneView, ScreenFade);
+		});
 }
 
 // RenderOpaque가 남긴 반투명 패킷을 먼 것부터 그린다.
@@ -158,6 +264,7 @@ void FRenderer::RenderTranslucent(const FMatrix& ViewProjection)
 	DrawPackets(FirstTranslucentIndex, SortEntries.Num(), ViewProjection);
 	RenderPackets.Reset();
 	FirstTranslucentIndex = 0;
+	DecalReceivers.clear();
 	StaticGroups.clear();   // 묶음 메모리는 World 것이므로 이번 프레임이 끝나면 놓는다
 }
 
@@ -210,6 +317,9 @@ void FRenderer::DrawStaticGroups()
 				RenderCommand::BindConstantBuffer(2, PerObjectCB.get(), EShaderBindFlagBits::Vertex);
 				UpdatePerObjectConstants(Item.Proxy->GetLocalToWorld(), Item.Proxy->GetNormalMatrix());
 			}
+
+			ApplyOpaquePassState(Group->Material, Item.Proxy);
+
 			RenderCommand::DrawIndexed(Item.IndexCount, Item.StartIndex);
 		}
 	}
@@ -234,7 +344,7 @@ void FRenderer::RenderQueueSorting(FRenderQueue& InQueue, const FMatrix& ViewPro
 		// ① 패킷을 한 번 훑으며 키를 만든다. 그릴 수 없는 패킷은 목록에 넣지 않는다.
 		SortEntries.Reset();
 		SortEntries.Reserve(RenderPackets.Num());
-		for (uint32 i = 0; i < RenderPackets.Num(); ++i)
+		for (uint32 i = 0; i < static_cast<uint32>(RenderPackets.Num()); ++i)
 		{
 			const FRenderPacket& P = RenderPackets[i];
 			if (!P.Mesh || !P.Material) continue;
@@ -247,7 +357,7 @@ void FRenderer::RenderQueueSorting(FRenderQueue& InQueue, const FMatrix& ViewPro
 
 		// ③ 반투명 시작 위치 = 최상위 비트가 처음 1인 곳
 		FirstTranslucentIndex = 0;
-		while (FirstTranslucentIndex < SortEntries.Num() && !(SortEntries[FirstTranslucentIndex].Key >> 63))
+		while (FirstTranslucentIndex < static_cast<uint32>(SortEntries.Num()) && !(SortEntries[FirstTranslucentIndex].Key >> 63))
 			++FirstTranslucentIndex;
 
 		// ④ 스태틱 메시 묶음: 빈 묶음을 빼고 키 순으로 정렬한다. 조각마다 같은 키 묶음이 있으므로 정렬하면 서로 붙는다.
@@ -301,6 +411,8 @@ void FRenderer::DrawPackets(uint32 Begin, uint32 End, const FMatrix& ViewProject
 			UpdatePerObjectConstants(RenderPacket, ViewProjection);
 		}
 
+		ApplyOpaquePassState(RenderPacket.Material, RenderPacket.Proxy);
+
 		RenderCommand::DrawIndexed(
 			RenderPacket.IndexCount ? RenderPacket.IndexCount : RenderPacket.Mesh->GetIndexBuffer(RenderPacket.LODIndex)->GetIndexCount(),
 			RenderPacket.StartIndex
@@ -319,7 +431,7 @@ FOcclusionMeasureResult FRenderer::MeasureOpaqueOcclusion(const FMatrix& ViewPro
 	// 불투명 드로우를 두 경로(스태틱 묶음, 일반 패킷)에서 한 목록으로 모은다. 그린 순서와 같게 묶음 먼저.
 	struct FMeasureDraw
 	{
-		UStaticMesh* Mesh;
+		FMeshRenderResource* Mesh;
 		UMaterial* Material;
 		uint8 LODIndex;
 		uint32 Slot;
@@ -366,7 +478,7 @@ FOcclusionMeasureResult FRenderer::MeasureOpaqueOcclusion(const FMatrix& ViewPro
 			return Result;
 	}
 
-	while (OcclusionQueries.Num() < Count)
+	while (static_cast<uint32>(OcclusionQueries.Num()) < Count)
 	{
 		const D3D11_QUERY_DESC QueryDesc{ D3D11_QUERY_OCCLUSION, 0 };
 		ComPtr<ID3D11Query> Query;
@@ -380,7 +492,7 @@ FOcclusionMeasureResult FRenderer::MeasureOpaqueOcclusion(const FMatrix& ViewPro
 	if (!bUsePerObjectSlots)
 		RenderCommand::BindConstantBuffer(2, PerObjectCB.get(), EShaderBindFlagBits::Vertex);
 
-	UStaticMesh* BoundMesh = nullptr;
+	const FMeshRenderResource* BoundMesh = nullptr;
 	UMaterial* BoundMaterial = nullptr;
 	uint8 BoundLOD = 0;
 
@@ -512,7 +624,9 @@ void FRenderer::BindMaterial(UMaterial* material, bool bReceiveShadow)
 		if (!ViewModeShaders[0][1])
 			SetViewMode(FViewRenderMode{});
 
-		bool bUseNormalMap = material->Textures.size() > 1 && material->Textures[1] != nullptr;
+		// The SSD prepass stores interpolated receiver normals, without material normal-map detail.
+		bool bUseNormalMap = OpaquePassMode != EOpaquePassMode::DepthPrepass &&
+			material->Textures.size() > 1 && material->Textures[1] != nullptr;
 		if (bUseNormalMap)
 		{
 			RenderCommand::BindShaderProgram(ViewModeShaders[1][bReceiveShadow ? 1 : 0]);
@@ -772,4 +886,26 @@ void FRenderer::RenderShadowPass(
 void FRenderer::BindShadowForShading()
 {
 	ShadowMapManager.BindForShading();
+}
+
+void FRenderer::SetDecalTextures(FTexture2D* BaseColor, FTexture2D* Normal)
+{
+	FDecalCompositeConstants Constants{};
+	Constants.bEnableDecalBaseColor = BaseColor ? 1u : 0u;
+	Constants.bEnableDecalNormal = Normal ? 1u : 0u;
+	RenderCommand::UpdateBufferData(DecalCompositeCB.get(), &Constants);
+	RenderCommand::BindConstantBuffer(7, DecalCompositeCB.get(), EShaderBindFlagBits::Pixel);
+
+	if (BaseColor)
+	{
+		RenderCommand::BindShaderResource(13, BaseColor, EShaderBindFlagBits::Pixel);
+	}
+	else
+	{
+		RenderCommand::UnbindShaderResource(13, EShaderBindFlagBits::Pixel);
+	}
+	if (Normal)
+		RenderCommand::BindShaderResource(15, Normal, EShaderBindFlagBits::Pixel);
+	else
+		RenderCommand::UnbindShaderResource(15, EShaderBindFlagBits::Pixel);
 }

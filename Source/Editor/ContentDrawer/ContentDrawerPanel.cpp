@@ -8,6 +8,27 @@
 #include "Sequence/LevelSequence.h"
 #include "Sequence/MovieScene.h"
 #include "Serialization/JsonArchive.h"
+#include "Asset/MeshAssetFile.h"
+
+namespace
+{
+	bool HasExtension(const fs::path& Path, const char* Extension)
+	{
+		return _stricmp(Path.extension().string().c_str(), Extension) == 0;
+	}
+
+	// 에셋이 있으면 원본은 보이지 않고 에셋 하나로 표시된다. .obj.bin은 자동 생성 캐시라 보이지 않는다
+	bool IsHiddenInDrawer(const fs::path& Path)
+	{
+		if (HasExtension(Path, ".bin") && HasExtension(Path.stem(), ".obj"))
+			return true;
+		if (HasExtension(Path, ".tmp"))
+			return true;
+		if (HasExtension(Path, ".fbx") || HasExtension(Path, ".obj"))
+			return FMeshAssetFile::Exists(FMeshAssetFile::MakeAssetPath(Path.generic_string()));
+		return false;
+	}
+}
 
 bool FContentDrawerPanel::Init()
 {
@@ -60,6 +81,12 @@ void FContentDrawerPanel::OnRender()
 
 	ImGui::BeginChild("AssetGridView");
 	{
+		if (ImGui::Button("Import") && ImportMesh)
+		{
+			ImportMesh(CurrentPath.generic_string());
+		}
+		ImGui::SetItemTooltip("Import a .fbx or .obj file into this folder.");
+		ImGui::SameLine();
 		DrawPathBar();
 		ImGui::Separator();
 		if (!CreateAssetError.empty())
@@ -92,10 +119,21 @@ void FContentDrawerPanel::OnRender()
 				if (TypeError)
 					continue;
 
+				if (!bIsDirectory && IsHiddenInDrawer(Path))
+					continue;
+
 				ImGui::TableNextColumn();
 
 				std::string PathString = Path.generic_string();
 				std::string FilenameString = Path.filename().string();
+
+				// humanoid.fbx.hasset은 humanoid.fbx로 보인다. 숨겨지지 않은 FBX는 아직 임포트되지 않은 것이다
+				const bool bMeshAsset = !bIsDirectory && HasExtension(Path, FMeshAssetFile::Extension);
+				const bool bUnimportedFbx = !bIsDirectory && HasExtension(Path, ".fbx");
+				if (bMeshAsset)
+				{
+					FilenameString = Path.stem().string();
+				}
 
 				ImGui::PushID(PathString.c_str()); // 각 위젯에 고유 ID 부여
 				UTexture2D* Thumbnail = nullptr;
@@ -176,9 +214,23 @@ void FContentDrawerPanel::OnRender()
 					{
 						OpenLevelSequence(PathString);
 					}
+					else if ((bMeshAsset || bUnimportedFbx) && OpenMesh)
+					{
+						OpenMesh(PathString);
+					}
+				}
+				if (bMeshAsset)
+				{
+					DrawMeshAssetMenu(PathString);
 				}
 				// 파일 이름 표시
 				ImGui::TextWrapped("%s", FilenameString.c_str());
+				if (bUnimportedFbx)
+				{
+					ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
+					ImGui::TextWrapped("Not imported");
+					ImGui::PopStyleColor();
+				}
 
 				ImGui::PopID();
 			}
@@ -199,6 +251,57 @@ void FContentDrawerPanel::OnRender()
 	}
 	ImGui::EndChild();
 	ImGui::End();
+}
+
+void FContentDrawerPanel::DrawMeshAssetMenu(const FString& AssetPath)
+{
+	if (!ImGui::BeginPopupContextItem("MeshAssetMenu"))
+		return;
+
+	if (ImGui::IsWindowAppearing())
+	{
+		MeshMenuSource.clear();
+
+		FMeshAssetInfo Info;
+		if (!FMeshAssetFile::ReadInfo(AssetPath, Info))
+		{
+			MeshMenuStatus = "The asset file could not be read";
+		}
+		else
+		{
+			MeshMenuSource = FMeshAssetFile::FindSource(Info);
+			if (MeshMenuSource.empty())
+			{
+				MeshMenuStatus = "Source not found";
+			}
+			else if (Info.SourceHash == 0)
+			{
+				MeshMenuStatus = "Source state unknown";
+			}
+			else
+			{
+				MeshMenuStatus = FMeshAssetFile::ComputeFileHash(MeshMenuSource) == Info.SourceHash ? "Source unchanged" : "Source changed";
+			}
+		}
+	}
+
+	ImGui::TextUnformatted(MeshMenuStatus.c_str());
+	if (!MeshMenuSource.empty())
+	{
+		ImGui::TextDisabled("%s", MeshMenuSource.c_str());
+	}
+	ImGui::Separator();
+
+	const bool bCanReimport = ReimportMesh != nullptr;
+	if (ImGui::MenuItem("Reimport", nullptr, false, bCanReimport && !MeshMenuSource.empty()))
+	{
+		ReimportMesh(AssetPath, MeshMenuSource);
+	}
+	if (ImGui::MenuItem("Reimport From File...", nullptr, false, bCanReimport))
+	{
+		ReimportMesh(AssetPath, FString());
+	}
+	ImGui::EndPopup();
 }
 
 void FContentDrawerPanel::CreateLevelSequenceFile()

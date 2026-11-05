@@ -3,6 +3,11 @@
 #include "LightSceneProxy.h"
 #include "Render/ColorWorkflow.h"
 #include <Core/StatOverlay.h>
+#include "Component/DecalComponent.h"
+#include "Component/SkinnedMeshComponent.h"
+#include "DecalSceneProxy.h"
+
+FScene::FScene() : DecalBVH([](const FDecalSceneProxy* Proxy) { return Proxy->GetBounds(); }) {}
 
 void FScene::AddPrimitive(UPrimitiveComponent* Component)
 {
@@ -20,6 +25,22 @@ void FScene::AddPrimitive(UPrimitiveComponent* Component)
 	PrimitiveFlags.Add(0);
 
 	bElementListChanged = true;
+}
+
+void FScene::SetShowSkeletalMeshes(const bool bInShow)
+{
+	if (bShowSkeletalMeshes == bInShow)
+		return;
+
+	bShowSkeletalMeshes = bInShow;
+	// 프록시가 가시성을 복사해 들고 있으므로 다시 읽게 한다 (그림자 캐시도 이 호출로 무효화된다)
+	for (FPrimitiveSceneProxy* Proxy : Proxies)
+	{
+		if (Cast<USkinnedMeshComponent>(Proxy->GetComponent()))
+		{
+			MarkRenderStateDirty(Proxy);
+		}
+	}
 }
 
 void FScene::RemovePrimitive(UPrimitiveComponent* Component)
@@ -238,6 +259,23 @@ void FScene::UpdateAllTransforms()
 		Proxy->bQueuedForUpdate = false;
 	}
 	DirtyLights.Reset();
+
+	const bool bDecalBoundsChanged = !DirtyDecals.IsEmpty();
+	for (FDecalSceneProxy* Proxy : DirtyDecals)
+	{
+		Proxy->UpdateFromComponent();
+		Proxy->bQueuedForUpdate = false;
+	}
+	DirtyDecals.Reset();
+	if (bDecalElementListChanged)
+	{
+		DecalBVH.Build(std::span(DecalProxies.GetData(), DecalProxies.Num()));
+		bDecalElementListChanged = false;
+	}
+	else if (bDecalBoundsChanged)
+	{
+		DecalBVH.Refit();
+	}
 
 	//const int32 Count = Proxies.Num();
 	//for (int32 i = 0; i < Count; ++i)
@@ -510,5 +548,58 @@ void FScene::BuildStructuredLightAndShadowData(TArray<FPointLightInfo>& OutPoint
 		}
 		}
 	}
+}
+
+void FScene::AddDecal(UDecalComponent* Component)
+{
+	if (!Component || Component->SceneProxy) return;
+
+	FDecalSceneProxy* Proxy = new FDecalSceneProxy(Component);
+
+	Proxy->Scene = this;
+	Component->SceneProxy = Proxy;
+
+	Proxy->UpdateFromComponent();
+	DecalProxies.Add(Proxy);
+	bDecalElementListChanged = true;
+}
+
+void FScene::RemoveDecal(UDecalComponent* Component)
+{
+	if (!Component || !Component->SceneProxy) return;
+
+	FDecalSceneProxy* Proxy = Component->SceneProxy;
+
+	const int32 DirtyIndex = DirtyDecals.Find(Proxy);
+	if (DirtyIndex != INDEX_NONE) DirtyDecals.RemoveAt(DirtyIndex);
+
+	const int32 Index = DecalProxies.Find(Proxy);
+	if (Index != INDEX_NONE) DecalProxies.RemoveAt(Index);
+
+	Component->SceneProxy = nullptr;
+	delete Proxy;
+	bDecalElementListChanged = true;
+}
+
+void FScene::RemoveAllDecals()
+{
+	for (FDecalSceneProxy* Proxy : DecalProxies)
+	{
+		Proxy->Component->SceneProxy = nullptr;
+		delete Proxy;
+	}
+
+	DecalProxies.Reset();
+	DirtyDecals.Reset();
+	DecalBVH.Clear();
+	bDecalElementListChanged = false;
+}
+
+void FScene::MarkDecalDirty(FDecalSceneProxy* Proxy)
+{
+	if (!Proxy || Proxy->bQueuedForUpdate) return;
+
+	Proxy->bQueuedForUpdate = true;
+	DirtyDecals.Add(Proxy);
 }
 

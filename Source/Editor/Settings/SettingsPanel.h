@@ -15,6 +15,9 @@ struct FEditorSettings
 	// 에디터 렌더 옵션과 Multiple Viewports 레이아웃의 영구 설정을 한곳에 담는다.
 	// Show: 화면에 무엇을 그릴지
 	bool bDrawPrimitives = true;
+	bool bShowSkeletalMeshes = true;
+	bool bDrawDecals = true;
+	int32 DecalRenderMode = static_cast<int32>(EDecalRenderMode::ReceiverMesh);
 	bool bDrawBoundingBox = false;
 	bool bShowUUID = false;
 	bool bDrawGrid = true;

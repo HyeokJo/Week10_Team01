@@ -12,7 +12,7 @@ FTextureCube::FTextureCube(ID3D11Device* Device, const D3D11_TEXTURE2D_DESC& InD
 	TArray<D3D11_SUBRESOURCE_DATA> SubDatas;
 	if (!InitialDatas.IsEmpty())
 	{
-		SubDatas.SetNum(InitialDatas.size());
+		SubDatas.SetNum(static_cast<int32>(InitialDatas.size()));
 		for (int i = 0; i < InitialDatas.size(); i++)
 		{
 			SubDatas[i].pSysMem = InitialDatas[i];

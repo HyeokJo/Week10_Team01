@@ -8,6 +8,7 @@
 
 #include "Component/PrimitiveComponent.h"
 #include "Component/StaticMeshComponent.h"
+#include "Component/SkeletalMeshComponent.h"   // Skinned 컴포넌트도 함께 포함된다
 #include "Component/TextRenderComponent.h"
 #include "Component/ParticleSubUVComponent.h"
 #include "Component/RotatingMovementComponent.h"
@@ -16,6 +17,8 @@
 #include "Component/SphereComponent.h"
 #include "Component/CapsuleComponent.h"
 #include "Component/ScriptComponent.h"
+#include "Component/DecalComponent.h"
+#include "Collision/Ray.h"
 #include "Camera/CameraComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 
@@ -398,6 +401,68 @@ namespace
 		}
 	}
 
+	// DrawMeshSlot의 스켈레탈 버전. 스킨드 컴포넌트면 SetSkeletalMesh를 거쳐 렌더 자원까지 다시 만든다
+	void DrawSkeletalMeshSlot(UObject* Owner, USkeletalMesh** SkeletalMeshPtr)
+	{
+		USkeletalMesh* Current = *SkeletalMeshPtr;
+
+		const FString CurrentPath = Current ? Current->GetPath() : "";
+		const FString CurrentFileName = Current ? GetAssetDisplayName(CurrentPath) : "None";
+
+		ImGui::SetNextItemWidth(-1.0f);
+
+		const bool bOpen = ImGui::BeginCombo("##SkeletalMesh", CurrentFileName.c_str());
+		if (ImGui::IsItemHovered() && Current)
+		{
+			ImGui::SetTooltip("%s", CurrentPath.c_str());
+		}
+		if (!bOpen)
+		{
+			return;
+		}
+
+		auto Select = [&](USkeletalMesh* Mesh)
+			{
+				if (USkinnedMeshComponent* SkinnedComponent = Cast<USkinnedMeshComponent>(Owner))
+					SkinnedComponent->SetSkeletalMesh(Mesh);
+				else
+					*SkeletalMeshPtr = Mesh;
+			};
+
+		if (ImGui::Selectable("None", Current == nullptr))
+		{
+			Select(nullptr);
+		}
+
+		TArray<USkeletalMesh*> Items;
+		for (TObjectIterator<USkeletalMesh> Itr; Itr; ++Itr)
+		{
+			Items.Add(*Itr);
+		}
+		std::sort(Items.begin(), Items.end(), [](USkeletalMesh* A, USkeletalMesh* B)
+			{
+				return _stricmp(GetAssetDisplayName(A->GetPath()).c_str(), GetAssetDisplayName(B->GetPath()).c_str()) < 0;
+			});
+
+		for (USkeletalMesh* Item : Items)
+		{
+			const bool bSelected = (Item == Current);
+			ImGui::PushID(Item);
+			if (ImGui::Selectable(GetAssetDisplayName(Item->GetPath()).c_str(), bSelected))
+			{
+				Select(Item);
+			}
+			if (ImGui::IsItemHovered())
+			{
+				ImGui::SetTooltip("%s", Item->GetPath().c_str());
+			}
+			ImGui::PopID();
+			if (bSelected)
+				ImGui::SetItemDefaultFocus();
+		}
+		ImGui::EndCombo();
+	}
+
 	bool DrawSequenceSlot(UObject* Owner, ULevelSequence** SequencePtr)
 	{
 		ULevelSequence* Current = *SequencePtr;
@@ -551,7 +616,15 @@ namespace
 			{
 				if (ImGui::BeginTable("MaterialProperties", 2))
 				{
-					ImGui::TableSetupColumn("Label", ImGuiTableColumnFlags_WidthFixed, 110.0f);
+					// 라벨 칸은 고정값 대신 가장 긴 라벨 길이로 정한다 (폰트가 바뀌어도 잘리지 않게)
+					float LabelColumnWidth = 0.0f;
+					for (const char* Label : { "Texture", "NormalTexture", "Flip Green", "Base Color", "UV Scroll",
+											   "Shininess", "Specular Color", "Sampler", "Blend Mode" })
+					{
+						LabelColumnWidth = std::max(LabelColumnWidth, ImGui::CalcTextSize(Label).x);
+					}
+					LabelColumnWidth += ImGui::GetStyle().ItemSpacing.x * 2.0f;
+					ImGui::TableSetupColumn("Label", ImGuiTableColumnFlags_WidthFixed, LabelColumnWidth);
 					ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
 
 					ImGui::TableNextRow();
@@ -783,18 +856,30 @@ namespace
 					ImGui::TableSetColumnIndex(1);
 					ImGui::SetNextItemWidth(-1.0f);
 
-					const char* SamplerItems[] = { "Linear Clamp", "Linear Wrap" };
-					int SamplerIndex = Effective ? static_cast<int>(Effective->SamplerState) : static_cast<int>(ESamplerState::LinearClamp);
+					static constexpr ESamplerState SamplerStates[] = {ESamplerState::LinearClamp, ESamplerState::LinearWrap, ESamplerState::Point};
+					const char* SamplerItems[] = {"Linear Clamp", "Linear Wrap", "Point"};
+					int SamplerIndex = 0;
+					if (Effective)
+					{
+						for (int i = 0; i < IM_ARRAYSIZE(SamplerStates); ++i)
+						{
+							if (Effective->SamplerState == SamplerStates[i])
+							{
+								SamplerIndex = i;
+								break;
+							}
+						}
+					}
 					if (ImGui::BeginCombo("##SamplerState", SamplerItems[SamplerIndex]))
 					{
-						for (int i = 0; i < static_cast<int>(ESamplerState::Count); ++i)
+						for (int i = 0; i < IM_ARRAYSIZE(SamplerItems); ++i)
 						{
 							if (ImGui::Selectable(SamplerItems[i], SamplerIndex == i))
 							{
 								Override = EnsureMaterialOverride(MeshComponent, Slot, Effective, Override);
 								if (Override)
 								{
-									Override->SamplerState = static_cast<ESamplerState>(i);
+									Override->SamplerState = SamplerStates[i];
 									Effective = Override;
 								}
 							}
@@ -838,6 +923,216 @@ namespace
 
 			ImGui::Separator();
 		}
+	}
+
+	UMaterial* EnsureDecalMaterialInstance(UDecalComponent* Decal, UMaterial* Effective)
+	{
+		if (!Decal)
+			return nullptr;
+
+		UMaterial* Current = Decal->GetDecalMaterial();
+
+		if (Current && Current->bIsInstance)
+			return Current;
+
+		UMaterial* Source = Current ? Current : Effective;
+
+		if (!Source)
+		{
+			Source = UAssetManager::GetAssetByPath<UMaterial>("DefaultMaterial");
+		}
+
+		if (!Source)
+			return nullptr;
+
+		UMaterial* Instance = UMaterial::CreateInstance(Source);
+		Decal->SetDecalMaterial(Instance);
+		return Instance;
+	}
+
+	void DrawDecalMaterial(UDecalComponent* Decal)
+	{
+		if (!Decal)
+			return;
+
+		ImGui::PushID(Decal);
+
+		if (!ImGui::CollapsingHeader("Decal Material", ImGuiTreeNodeFlags_DefaultOpen))
+		{
+			ImGui::PopID();
+			return;
+		}
+
+		UMaterial* Current = Decal->GetDecalMaterial();
+		UMaterial* Effective = Current ? Current : UAssetManager::GetAssetByPath<UMaterial>("DefaultMaterial");
+
+		// 현재 인스턴스를 초기화하는 기능
+		if (Current)
+		{
+			ImGui::SameLine();
+			ImGui::TextDisabled("Instance");
+			ImGui::SameLine();
+
+			if (ImGui::SmallButton("Reset"))
+			{
+				Decal->SetDecalMaterial(nullptr);
+				Current = nullptr;
+				Effective = UAssetManager::GetAssetByPath<UMaterial>("DefaultMaterial");
+			}
+		}
+		else
+		{
+			ImGui::SameLine();
+			ImGui::TextDisabled("Default");
+		}
+
+		if (!Effective)
+		{
+			ImGui::TextDisabled("DefaultMaterial not found");
+			ImGui::PopID();
+			return;
+		}
+
+		constexpr float ThumbnailSize = 64.0f;
+
+		if (ImGui::BeginTable("DecalMaterialProperties", 2))
+		{
+			ImGui::TableSetupColumn("Label", ImGuiTableColumnFlags_WidthFixed, 110.0f);
+			ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
+
+			// --------------------------------------------------
+			// Texture
+			// --------------------------------------------------
+
+			ImGui::TableNextRow();
+			ImGui::TableSetColumnIndex(0);
+			ImGui::Text("Texture");
+
+			ImGui::TableSetColumnIndex(1);
+
+			UTexture2D* Texture = Effective->Textures.Num() > 0 ? Effective->Textures[0] : nullptr;
+
+			if (Texture && Texture->GetResource())
+			{
+				ImGui::Image((ImTextureID)Texture->GetResource()->GetRawSRV(), { ThumbnailSize, ThumbnailSize });
+			}
+			else
+			{
+				ImGui::Button("Empty", { ThumbnailSize, ThumbnailSize });
+			}
+
+			// 텍스처 드래그 앤 드롭
+			if (ImGui::BeginDragDropTarget())
+			{
+				if (const ImGuiPayload* Payload = ImGui::AcceptDragDropPayload(EditorDragDrop::Texture))
+				{
+					UTexture2D* DroppedTexture = *static_cast<UTexture2D**>(Payload->Data);
+
+					UMaterial* Instance = EnsureDecalMaterialInstance(Decal, Effective);
+
+					if (Instance)
+					{
+						while (Instance->Textures.Num() <= 0)
+						{
+							Instance->Textures.Add(nullptr);
+						}
+
+						Instance->Textures[0] = DroppedTexture;
+						Decal->SetTexturePath(DroppedTexture ? DroppedTexture->GetPath() : FString());
+						Effective = Instance;
+						Texture = DroppedTexture;
+					}
+				}
+
+				ImGui::EndDragDropTarget();
+			}
+
+			ImGui::SameLine();
+
+			if (Texture)
+			{
+				ImGui::TextWrapped("%s", Texture->GetPath().c_str());
+
+				if (ImGui::IsItemHovered())
+				{
+					ImGui::SetTooltip("%s", Texture->GetPath().c_str());
+				}
+			}
+			else
+			{
+				ImGui::TextDisabled("(Empty)");
+			}
+
+			// --------------------------------------------------
+			// Base Color
+			// --------------------------------------------------
+
+			ImGui::TableNextRow();
+			ImGui::TableSetColumnIndex(0);
+			ImGui::Text("Base Color");
+
+			ImGui::TableSetColumnIndex(1);
+			ImGui::SetNextItemWidth(-1.0f);
+
+			FLinearColor TempColor = Effective->BaseColor;
+
+			if (ColorEditLinear("##DecalBaseColor", &TempColor.R))
+			{
+				UMaterial* Instance = EnsureDecalMaterialInstance(Decal, Effective);
+
+				if (Instance)
+				{
+					Instance->BaseColor = TempColor;
+					Decal->MarkSceneProxyDirty();
+					Effective = Instance;
+				}
+			}
+
+			// --------------------------------------------------
+			// Sampler
+			// --------------------------------------------------
+
+			ImGui::TableNextRow();
+			ImGui::TableSetColumnIndex(0);
+			ImGui::Text("Sampler");
+
+			ImGui::TableSetColumnIndex(1);
+			ImGui::SetNextItemWidth(-1.0f);
+
+			static constexpr ESamplerState SamplerStates[] = {ESamplerState::LinearClamp, ESamplerState::LinearWrap, ESamplerState::Point};
+			const char* SamplerItems[] = {"Linear Clamp", "Linear Wrap", "Point"};
+			int SamplerIndex = 0;
+			for (int i = 0; i < IM_ARRAYSIZE(SamplerStates); ++i)
+			{
+				if (Effective->SamplerState == SamplerStates[i])
+				{
+					SamplerIndex = i;
+					break;
+				}
+			}
+
+			if (ImGui::BeginCombo("##DecalSampler", SamplerItems[SamplerIndex]))
+			{
+				for (int i = 0; i < IM_ARRAYSIZE(SamplerItems); ++i)
+				{
+					if (ImGui::Selectable(SamplerItems[i], SamplerIndex == i))
+					{
+						UMaterial* Instance = EnsureDecalMaterialInstance(Decal, Effective);
+
+						if (Instance)
+						{
+							Instance->SamplerState = SamplerStates[i];
+							Decal->MarkSceneProxyDirty();
+							Effective = Instance;
+						}
+					}
+				}
+				ImGui::EndCombo();
+			}
+			ImGui::EndTable();
+		}
+
+		ImGui::PopID();
 	}
 
 	// UClass에 등록된 프로퍼티를 타입에 맞는 위젯으로 그린다
@@ -996,6 +1291,10 @@ namespace
 			{
 				DrawMeshSlot(Object, reinterpret_cast<UStaticMesh**>(ObjPtr));
 			}
+			else if (Property.Class == USkeletalMesh::StaticClass())
+			{
+				DrawSkeletalMeshSlot(Object, reinterpret_cast<USkeletalMesh**>(ObjPtr));
+			}
 			else if (Property.Class == ULevelSequence::StaticClass())
 			{
 				bChanged = DrawSequenceSlot(Object, reinterpret_cast<ULevelSequence**>(ObjPtr));
@@ -1123,6 +1422,12 @@ namespace
 			if (ImGui::MenuItem("StaticMesh Component"))
 			{
 				OutSelectedComponent = Actor->AddComponent(UStaticMeshComponent::StaticClass(), FString(ComponentNameInputBuf));
+				ComponentNameInputBuf[0] = '\0';
+				ImGui::CloseCurrentPopup();
+			}
+			if (ImGui::MenuItem("SkeletalMesh Component"))
+			{
+				OutSelectedComponent = Actor->AddComponent(USkeletalMeshComponent::StaticClass(), FString(ComponentNameInputBuf));
 				ComponentNameInputBuf[0] = '\0';
 				ImGui::CloseCurrentPopup();
 			}
@@ -1322,6 +1627,20 @@ void FDetailsPanel::OnRender()
 			if (UMeshComponent* MeshComponent = Cast<UMeshComponent>(TargetComponent))
 			{
 				DrawMaterialSlots(MeshComponent);
+			}
+			if (UDecalComponent* DecalComponent = Cast<UDecalComponent>(TargetComponent))
+			{
+				if (ImGui::Button("Snap to Surface"))
+				{
+					const FMatrix World = DecalComponent->GetWorldMatrix();
+					const FVector Forward = World.TransformVector(FVector::ForwardVector).GetSafeNormal();
+					const float HalfDepth = World.TransformVector(FVector::ForwardVector).Size() * DecalComponent->GetDecalSize().X;
+					if (!DecalComponent->ProjectOntoSurface({DecalComponent->GetWorldLocation() - Forward * (HalfDepth + 0.05f), Forward}))
+						HTR_LOG(Warning, "Decal: no receiving mesh found along the projection direction");
+				}
+				if (ImGui::IsItemHovered())
+					ImGui::SetTooltip("Align to the nearest surface along local +X and reduce projection thickness to 0.1 world units.");
+				DrawDecalMaterial(DecalComponent);
 			}
 			if (ULightComponent* Light = Cast<ULightComponent>(TargetComponent))
 			{

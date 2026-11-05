@@ -3,7 +3,7 @@
 #include "RenderDevice.h"
 
 class FBuffer;
-class UStaticMesh;
+class FMeshRenderResource;
 class UTexture2D;
 class FShaderProgram;
 class FVertexShader;
@@ -45,11 +45,12 @@ public:
 
 	static void BindPipelineState(const FPipelineState& PipelineState);
 
-	static void BindMesh(UStaticMesh* Mesh, uint32 LODIndex = 0);
+	static void BindMesh(const FMeshRenderResource* Mesh, uint32 LODIndex = 0);
 
 	static void BindShaderProgram(FShaderProgram* Shader);
 
 	static void Draw(uint32 VertexCount, uint32 StartIndexLocation = 0);
+	static void DrawInstanced(uint32 VertexCountPerInstance, uint32 InstanceCount);
 	static void DrawIndexed(uint32 IndexCount, uint32 StartIndexLocation = 0, int32 BaseVertexLocation = 0);
 	static void DrawInstance(uint32 IndexCount, uint32 StartIndexLocation = 0, int32 BaseVertexLocation = 0);
 
@@ -74,6 +75,7 @@ public:
 	// bRawData: 노멀맵처럼 색이 아닌 데이터는 sRGB로 불러왔더라도 저장된 값 그대로 읽는다.
 	static void BindShaderResource(uint32 Slot, FTexture2D* Texture2D, EShaderBindFlagBits FlagBits, bool bRawData = false);
 	static void BindShaderResource(uint32 Slot, UTexture2D* Texture2D, EShaderBindFlagBits FlagBits, bool bRawData = false);
+	static void BindStencilShaderResource(uint32 Slot, FTexture2D* Texture2D, EShaderBindFlagBits FlagBits);
 	// 슬롯의 SRV를 비운다. 같은 텍스처를 다음 패스에서 RTV로 쓰기 전에 호출한다.
 	static void UnbindShaderResource(uint32 Slot, EShaderBindFlagBits FlagBits);
 	// 크기·포맷이 같은 두 텍스처의 내용을 통째로 복사한다.
@@ -84,10 +86,10 @@ public:
 	static void ClearDepthStencil(FTexture2D* DepthStencilTexture, float Depth = 1.0f, uint8 Stencil = 0);
 
 	static void SetViewport(uint32 InX, uint32 InY, uint32 InWidth, uint32 InHeight);
-
+	static void SetScissorRect(int32 Left, int32 Top, int32 Right, int32 Bottom);
 	static void SetRasterizerState(ERasterizerState State);
 	static void SetBlendState(EBlendState State);
-	static void SetDepthStencilState(EDepthStencilState State);
+	static void SetDepthStencilState(EDepthStencilState State, uint32 StencilRef = 0);
 	static void BindSamplerState(uint32 Slot, ESamplerState SamplerState, EShaderBindFlagBits FlagBits);
 
 	inline static void SetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY Topology)

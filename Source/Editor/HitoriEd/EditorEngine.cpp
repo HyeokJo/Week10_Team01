@@ -19,6 +19,7 @@
 #include "Render/Renderer.h"
 
 #include "Asset/AssetManager.h"
+#include "Asset/FbxImporter/FbxImporter.h"
 #include "Render/RenderResourceManager.h"
 
 #include "Render/RenderCommand.h"
@@ -39,7 +40,11 @@
 #include "GameFramework/PlayerController.h"
 
 #include "Component/ShapeComponent.h"
+#include "Component/SkeletalMeshDebugComponent.h"
+#include "Component/DecalComponent.h"
+#include "GameFramework/Actor/DecalActor.h"
 #include "Engine/GameViewportClient.h"
+#include "Asset/MeshAssetFile.h"
 
 namespace
 {
@@ -122,6 +127,49 @@ bool UEditorEngine::Init()
 	ContentDrawerPanel->SetOpenLevelSequenceBinding([this](const FString& Path)
 	{
 		LevelSequencerPanel->OpenSequenceFile(Path);
+	});
+	SkeletalMeshViewerPanel = EditorUI->AddEditorPanel<FSkeletalMeshViewerPanel>();
+	SkeletalMeshViewerPanel->SetViewer(&SkeletalMeshViewer);
+	MeshImportWindow.Init(UAssetManager::GetUnimportedFbxPaths());
+	ContentDrawerPanel->SetOpenMeshBinding([this](const FString& Path)
+	{
+		PendingViewerFbxPath = Path;
+	});
+	ContentDrawerPanel->SetImportMeshBinding([this](const FString& TargetFolder)
+	{
+		if (IsPlaying())
+		{
+			HTR_LOG(Warning, "Cannot import during PIE. Stop the play session first.");
+			return;
+		}
+		for (const FString& Path : FEditorFileUtils::OpenImportMeshDialog())
+		{
+			MeshImportWindow.Enqueue(Path, TargetFolder);
+		}
+	});
+	ContentDrawerPanel->SetReimportMeshBinding([this](const FString& AssetPath, const FString& SourcePath)
+	{
+		if (IsPlaying())
+		{
+			HTR_LOG(Warning, "Cannot reimport during PIE. Stop the play session first.");
+			return;
+		}
+
+		FString Source = SourcePath;
+		if (Source.empty())
+		{
+			const TArray<FString> Picked = FEditorFileUtils::OpenImportMeshDialog();
+			if (Picked.IsEmpty())
+				return;
+			Source = Picked[0];
+		}
+
+		// 파일이 깨져 옵션을 못 읽으면 임포트 기본값에서 시작한다
+		FMeshAssetInfo Info;
+		Info.Options.bImportStaticMesh = true;
+		Info.Options.bImportSkeletalMesh = true;
+		FMeshAssetFile::ReadInfo(AssetPath, Info);
+		MeshImportWindow.EnqueueReimport(Source, AssetPath, Info.Options);
 	});
 
 	SceneRenderer.Init(Renderer);
@@ -268,14 +316,21 @@ bool UEditorEngine::Init()
 	Duplicate.Execute = [this]() { CopySelectedActors(); PasteCopiedActors(); };
 
 	FocusSelection = { "Focus", "Focus Selected Actors", nullptr, White, { EKeyCode::F } };
-	FocusSelection.CanExecute = [this]() { return !Selection.IsEmpty(); };
-	FocusSelection.Execute = [this]() { FocusOnSelection(); };
+	FocusSelection.CanExecute = [this]() { return IsSkeletalMeshViewerActive() || !Selection.IsEmpty(); };
+	FocusSelection.Execute = [this]()
+	{
+		if (IsSkeletalMeshViewerActive())
+			SkeletalMeshViewer.FocusOnSelectedBone();
+		else
+			FocusOnSelection();
+	};
 
 	CycleGizmoMode = { "Gizmo Mode", "Cycle Gizmo Mode", nullptr, White, { EKeyCode::Space } };
 	CycleGizmoMode.Execute = [this]()
 	{
-		const int NextMode = (static_cast<int>(Gizmo->GetMode()) + 1) % 3;
-		Gizmo->SetMode(static_cast<EGizmoMode>(NextMode));
+		FGizmo& TargetGizmo = IsSkeletalMeshViewerActive() ? SkeletalMeshViewer.GetGizmo() : *Gizmo;
+		const int NextMode = (static_cast<int>(TargetGizmo.GetMode()) + 1) % 3;
+		TargetGizmo.SetMode(static_cast<EGizmoMode>(NextMode));
 	};
 
 	EditorUI->GetToolbar()->SetActorSpawnBinding(
@@ -314,6 +369,8 @@ void UEditorEngine::Tick(const float DeltaTime)
 
 	// 유저의 World 전환 요청을 처리한다.
 	TickWorldTravel();
+	ProcessMeshImportRequest();
+	ProcessSkeletalMeshViewerRequests();
 
 	BeginFrame(DeltaTime);
 	// 임시: 선택된 Actor를 복제해서 결과를 로그로 확인 (PIE 연결 후 삭제)
@@ -395,11 +452,15 @@ void UEditorEngine::UpdateMultipleViewportState(const float DeltaTime)
 	// 우클릭 + 휠로 바뀐 이동 속도는 Settings에 바로 저장되고, 바뀐 View에 잠시 표시한다.
 	float& CameraSpeed = SettingsPanel->GetMutableSettings().CameraSpeed;
 	const float PreviousCameraSpeed = CameraSpeed;
-	MultipleViewportsAdapter.UpdateInput(
-		DeltaTime,
-		LocalMousePosition,
-		CameraSpeed,
-		SettingsPanel->GetSettings().MouseSensitivity);
+	// 어댑터는 위에 겹친 창을 모르므로, 뷰어가 입력을 가져간 프레임에는 레벨 어댑터를 부르지 않는다.
+	if (!UpdateSkeletalMeshViewerInput(DeltaTime))
+	{
+		MultipleViewportsAdapter.UpdateInput(
+			DeltaTime,
+			LocalMousePosition,
+			CameraSpeed,
+			SettingsPanel->GetSettings().MouseSensitivity);
+	}
 	if (CameraSpeed != PreviousCameraSpeed)
 		ViewportsPanel->ShowCameraSpeed(MultipleViewportsAdapter.GetActiveViewIndex(), CameraSpeed);
 	// 겹친 창은 Hover 선택에서 제외하고 우클릭 Capture를 우선한다.
@@ -428,6 +489,8 @@ void UEditorEngine::TickWorldAndEditor(const float DeltaTime)
 			FLuaScriptSystem::Get().Update(GameDeltaTime);
 		}
 
+		// PIE 일시정지와 무관하게 뷰어 편집은 반영한다
+		SkeletalMeshViewer.Tick(DeltaTime);
 	}
 	{
 		SCOPE_CYCLE_COUNTER(STAT_EditorTick);
@@ -435,13 +498,20 @@ void UEditorEngine::TickWorldAndEditor(const float DeltaTime)
 	}
 	// 라이트 프록시가 아래 UpdateAllTransforms에서 바뀐 작업 흐름으로 다시 계산되도록 먼저 반영한다.
 	ColorWorkflow::bLinear = SettingsPanel->GetSettings().bLinearWorkflow;
+	// 프리뷰 월드에는 넘기지 않는다. 뷰어는 메시를 보려고 여는 창이라 레벨의 Show 설정을 따르지 않는다.
+	EditorWorld->GetScene().SetShowSkeletalMeshes(SettingsPanel->GetSettings().bShowSkeletalMeshes);
+	if (PlayWorld)
+		PlayWorld->GetScene().SetShowSkeletalMeshes(SettingsPanel->GetSettings().bShowSkeletalMeshes);
 	// 월드 캡처는 View마다 그릴 월드가 다르므로 RenderMultipleViewports에서 한다.
 	// PIE 중에도 PIE가 아닌 View에서는 EditorWorld 편집을 계속한다.
 	UpdateGizmoAndPicking();
+	SkeletalMeshViewer.UpdateBoneGizmo(SkeletalMeshViewerPanel->GetLocalMousePosition(), SkeletalMeshViewerPanel->IsViewHovered());
 	//SCOPE_CYCLE_COUNTER(STAT_UpdateAllTransforms);
 	EditorWorld->GetScene().UpdateAllTransforms();
 	if (PlayWorld && bIsPaused)
 		PlayWorld->GetScene().UpdateAllTransforms();
+	if (UWorld* PreviewWorld = SkeletalMeshViewer.GetWorld())
+		PreviewWorld->GetScene().UpdateAllTransforms();   // 기즈모가 바꾼 포즈의 바운드와 그림자를 같은 프레임에 반영한다
 }
 
 // View가 그릴 월드가 바뀔 때만 다시 캡처해 활성 View별 렌더 큐를 만들고 렌더한다.
@@ -477,7 +547,7 @@ void UEditorEngine::RenderMultipleViewports()
 			MultipleViewportsAdapter.BuildRenderQueue(ViewIndex, RenderQueue);
 		}
 
-		FSceneView SceneView = MakeSceneView(ViewIndex);
+		FSceneView SceneView = MakeSceneView(MultipleViewportsAdapter, ViewIndex);
 
 		RenderFrame(
 			SceneView,
@@ -485,11 +555,13 @@ void UEditorEngine::RenderMultipleViewports()
 			*ViewWorld,
 			ViewportsPanel->GetSceneRenderingInfo(ViewIndex),
 			ViewportsPanel->GetRenderingInfo(ViewIndex),
+			ViewportsPanel->GetDecalBaseColorTarget(ViewIndex),
+			ViewportsPanel->GetDecalNormalTarget(ViewIndex),
 			GetFxaaTargetForView(ViewIndex),
 			RenderQueue);
 
 		const FRenderingInfo& RenderingInfo = ViewportsPanel->GetRenderingInfo(ViewIndex);
-		RenderOverlayPass(ViewIndex, *ViewWorld, RenderingInfo, SceneView.ViewProjection, SceneView.Location, SceneView.Forward, RenderQueue);
+		RenderOverlayPass(MultipleViewportsAdapter, ViewIndex, *ViewWorld, RenderingInfo, SceneView.ViewProjection, SceneView.Location, SceneView.Forward, RenderQueue);
 	}
 
 	// 별도 PIE 창은 패널 View 뒤에 PlayWorld를 한 번 더 캡처해 그린다.
@@ -508,7 +580,7 @@ void UEditorEngine::RenderMultipleViewports()
 			MultipleViewportsAdapter.BuildRenderQueue(PIEViewIndex, RenderQueue);
 		}
 
-		FSceneView SceneView = MakeSceneView(PIEViewIndex);
+		FSceneView SceneView = MakeSceneView(MultipleViewportsAdapter, PIEViewIndex);
 
 		RenderFrame(
 			SceneView,
@@ -516,12 +588,16 @@ void UEditorEngine::RenderMultipleViewports()
 			*ViewWorld,
 			PIETargets.SceneInfo,
 			PIETargets.ViewInfo,
+			PIETargets.DecalBaseColor.get(),
+			PIETargets.DecalNormal.get(),
 			GetFxaaTargetForView(PIEViewIndex),
 			RenderQueue);
 
-		RenderOverlayPass(PIEViewIndex, *ViewWorld, PIETargets.ViewInfo, SceneView.ViewProjection, SceneView.Location, SceneView.Forward, RenderQueue);
+		RenderOverlayPass(MultipleViewportsAdapter, PIEViewIndex, *ViewWorld, PIETargets.ViewInfo, SceneView.ViewProjection, SceneView.Location, SceneView.Forward, RenderQueue);
 		CopyPIEWindowToBackbuffer();
 	}
+
+	RenderSkeletalMeshViewer(SceneRenderSettings);
 
 	EMultipleViewportsCameraPreset CameraPresets[4]{};
 	for (int32 ViewIndex = 0; ViewIndex < 4; ++ViewIndex) {
@@ -537,6 +613,128 @@ void UEditorEngine::RenderMultipleViewports()
 		MultipleViewportsAdapter.GetLayoutMode(),
 		MultipleViewportsAdapter.GetSingleViewIndex(),
 		CameraPresets);
+}
+
+
+void UEditorEngine::ProcessMeshImportRequest()
+{
+	FMeshImportRequest Request;
+	FFbxImportOptions Options;
+	if (!MeshImportWindow.ConsumeImportRequest(Request, Options))
+		return;
+
+	const bool bSuccess = Request.bReimport
+		? UAssetManager::ReimportMesh(Request.SourcePath, Request.AssetPath, Options)
+		: UAssetManager::ImportMesh(Request.SourcePath, Request.AssetPath, Options) != nullptr;
+	if (!bSuccess)
+	{
+		HTR_LOG(Error, "Failed to import mesh: {}", Request.SourcePath);
+	}
+	MeshImportWindow.ReportImportResult(Request, bSuccess);
+}
+
+void UEditorEngine::ProcessSkeletalMeshViewerRequests()
+{
+	if (SkeletalMeshViewer.IsOpen() && !SkeletalMeshViewerPanel->IsOpen())
+	{
+		SkeletalMeshViewer.Close();
+	}
+
+	if (PendingViewerFbxPath.empty())
+		return;
+
+	const FString ClickedPath = std::move(PendingViewerFbxPath);
+	PendingViewerFbxPath.clear();
+
+	// 뷰어를 열지는 확장자가 아니라 로드된 에셋의 종류로 정한다. 키에는 .hasset이 없다
+	const bool bClickedAsset = fs::path(ClickedPath).extension() == FMeshAssetFile::Extension;
+	const FString Path = bClickedAsset ? FMeshAssetFile::StripExtension(ClickedPath) : ClickedPath;
+
+	const FString Key = UAssetManager::GetAssetKeyFromPath(Path);
+	USkeletalMesh* Mesh = UAssetManager::GetAssetByPath<USkeletalMesh>(Key);
+	if (!Mesh)
+	{
+		if (UAssetManager::GetAssetByPath<UAsset>(Key))
+		{
+			HTR_LOG(Info, "Skeletal Mesh Viewer: '{}' is not a skeletal mesh", Path);
+		}
+		else if (IsPlaying())
+		{
+			HTR_LOG(Warning, "Cannot import '{}' during PIE. Stop the play session first.", Path);
+		}
+		else if (bClickedAsset && !FMeshAssetFile::Exists(Path))
+		{
+			// 읽지 못한 에셋인데 다시 만들 원본이 옆에 없다
+			HTR_LOG(Warning, "Cannot open '{}': the asset could not be loaded and the source is missing", ClickedPath);
+		}
+		else
+		{
+			// 아직 임포트하지 않은 FBX는 옵션 창으로 보낸다
+			MeshImportWindow.Enqueue(Path, fs::path(Path).parent_path().generic_string());
+		}
+		return;
+	}
+
+	SkeletalMeshViewer.Open(Mesh);
+	SkeletalMeshViewerPanel->SetOpen(true);
+	SkeletalMeshViewerPanel->RequestFocus();
+}
+
+bool UEditorEngine::IsSkeletalMeshViewerActive() const
+{
+	return SkeletalMeshViewer.IsOpen() && !ViewportsPanel->IsHovered()
+		&& (SkeletalMeshViewerPanel->IsWindowFocused() || SkeletalMeshViewerPanel->IsWindowHovered());
+}
+
+bool UEditorEngine::UpdateSkeletalMeshViewerInput(const float DeltaTime)
+{
+	if (!SkeletalMeshViewer.IsOpen())
+		return false;
+
+	const FVector2 ViewSize = SkeletalMeshViewerPanel->GetViewSize();
+	if (ViewSize.X >= 1.0f && ViewSize.Y >= 1.0f)
+	{
+		SkeletalMeshViewer.SetViewSize(static_cast<uint32>(ViewSize.X), static_cast<uint32>(ViewSize.Y));
+	}
+
+	// 우클릭으로 잡고 있는 쪽이 놓을 때까지 입력을 갖는다. 커서가 다른 창으로 넘어가도 끊기지 않는다.
+	FMultipleViewportsAdapter& Adapter = SkeletalMeshViewer.GetAdapter();
+	const bool bViewerCaptured = Adapter.GetCapturedViewIndex() != InvalidViewIndex;
+	const bool bLevelCaptured = MultipleViewportsAdapter.GetCapturedViewIndex() != InvalidViewIndex;
+	if (!bViewerCaptured && (bLevelCaptured || !SkeletalMeshViewerPanel->IsViewHovered()))
+	{
+		if (bLevelCaptured || !SkeletalMeshViewerPanel->IsWindowHovered())
+			return false;
+
+		// 하이라키나 제목 표시줄 위: 어느 카메라도 움직이지 않는다.
+		// 휠 값은 읽을 때까지 쌓이므로 비워 둔다. 하이라키 스크롤은 ImGui가 따로 처리한다.
+		(void)FInputSystem::GetWheelDelta();
+		return true;
+	}
+
+	FEditorSettings& Settings = SettingsPanel->GetMutableSettings();
+	Adapter.UpdateInput(DeltaTime, SkeletalMeshViewerPanel->GetLocalMousePosition(), Settings.CameraSpeed, Settings.MouseSensitivity);
+	return true;
+}
+
+void UEditorEngine::RenderSkeletalMeshViewer(const FSceneRenderSettings& Settings)
+{
+	UWorld* ViewWorld = SkeletalMeshViewer.GetWorld();
+	if (!ViewWorld)
+		return;
+
+	FMultipleViewportsAdapter& Adapter = SkeletalMeshViewer.GetAdapter();
+	const int32 ViewIndex = FSkeletalMeshViewer::ViewIndex;
+	const FSceneRenderTargets& Targets = SkeletalMeshViewer.GetTargets();
+
+	Adapter.CaptureWorld(*ViewWorld);
+	Adapter.BuildRenderQueue(ViewIndex, RenderQueue);
+
+	const FSceneView SceneView = MakeSceneView(Adapter, ViewIndex);
+	RenderFrame(SceneView, Settings, *ViewWorld, Targets.SceneInfo, Targets.ViewInfo, Targets.FxaaTemp.get(), nullptr, nullptr, RenderQueue);
+	RenderOverlayPass(Adapter, ViewIndex, *ViewWorld, Targets.ViewInfo, SceneView.ViewProjection, SceneView.Location, SceneView.Forward, RenderQueue);
+
+	ViewWorld->GetScene().ClearShadowDirty();
 }
 
 void UEditorEngine::UpdatePIEViewCamera()
@@ -583,19 +781,19 @@ void UEditorEngine::EndFrame()
 	FStatRegistry::EndFrame();
 }
 
-FSceneView UEditorEngine::MakeSceneView(int32 ViewIndex) const
+FSceneView UEditorEngine::MakeSceneView(const FMultipleViewportsAdapter& Adapter, int32 ViewIndex) const
 {
-	const FRect& Rect = MultipleViewportsAdapter.GetViewRect(ViewIndex);
-	const FCameraProjection& Projection = MultipleViewportsAdapter.GetEngineProjection(ViewIndex);
+	const FRect& Rect = Adapter.GetViewRect(ViewIndex);
+	const FCameraProjection& Projection = Adapter.GetEngineProjection(ViewIndex);
 
 	return {
-		.ViewProjection = MultipleViewportsAdapter.GetEngineViewProjection(ViewIndex),
-		.Location = MultipleViewportsAdapter.GetEngineCameraLocation(ViewIndex),
-		.Forward = MultipleViewportsAdapter.GetEngineCameraForward(ViewIndex),
+		.ViewProjection = Adapter.GetEngineViewProjection(ViewIndex),
+		.Location = Adapter.GetEngineCameraLocation(ViewIndex),
+		.Forward = Adapter.GetEngineCameraForward(ViewIndex),
 		.FovDegrees = Projection.FovDegrees > 0.0f ? Projection.FovDegrees : 60.0f,
 		.AspectRatio = (Rect.Width > 0.0f && Rect.Height > 0.0f) ? Rect.Width / Rect.Height : 16.0f / 9.0f,
 		.bOrthographic = Projection.Mode == EProjectionMode::Orthographic,
-		.RenderMode = MultipleViewportsAdapter.GetViewRenderMode(ViewIndex)
+		.RenderMode = Adapter.GetViewRenderMode(ViewIndex)
 	};
 }
 
@@ -613,6 +811,8 @@ FSceneRenderSettings UEditorEngine::MakeSceneRenderSettings() const
 
 	return {
 		.bDrawPrimitives = Settings.bDrawPrimitives,
+		.bDrawDecals = Settings.bDrawDecals,
+		.DecalRenderMode = static_cast<EDecalRenderMode>(Settings.DecalRenderMode),
 		.bDrawShadows = Settings.bDrawShadows,
 		.ShadowFilter = Filter,
 		.bExponentialHeightFog = Settings.bExponentialHeightFog,
@@ -683,11 +883,15 @@ void UEditorEngine::HandleOnPIEWorldChanged(UWorld* OldWorld, UWorld* NewWorld)
 	PlayWorld = NewWorld;
 }
 
-void UEditorEngine::RenderOverlayPass(const int32 ViewIndex, UWorld& ViewWorld, const FRenderingInfo& ViewRenderingInfo, const FMatrix& ViewProjection, const FVector& ViewCameraLocation, const FVector& ViewCameraForward, FRenderQueue& RenderQueue)
+void UEditorEngine::RenderOverlayPass(const FMultipleViewportsAdapter& Adapter, const int32 ViewIndex, UWorld& ViewWorld, const FRenderingInfo& ViewRenderingInfo, const FMatrix& ViewProjection, const FVector& ViewCameraLocation, const FVector& ViewCameraForward, FRenderQueue& RenderQueue)
 {
+	// View 번호는 어댑터마다 따로 매겨지므로 PIE 판정은 레벨 어댑터에서만 한다.
+	const bool bPlayingView = &Adapter == &MultipleViewportsAdapter && IsPlayingView(ViewIndex);
 	// 실행 중인 PIE View에는 Grid·Gizmo·Outline 같은 에디터 표시를 그리지 않는다.
 	// 별도 PIE 창은 편집 입력이 없으므로 일시정지 중에도 게임 화면만 보인다.
-	const bool bShowEditorOverlay = !IsPlayingView(ViewIndex) && ViewIndex != FMultipleViewportsAdapter::ExternalViewIndex;
+	const bool bShowEditorOverlay = !bPlayingView && ViewIndex != FMultipleViewportsAdapter::ExternalViewIndex;
+	// 뷰어는 메시와 뼈만 보여 준다. 라이트 방향·액터 바운드·UUID는 그리지 않는다.
+	const bool bPreviewWorld = ViewWorld.GetWorldType() == EWorldType::EditorPreview;
 
 	FRenderingInfo PassInfo = ViewRenderingInfo;
 
@@ -706,15 +910,18 @@ void UEditorEngine::RenderOverlayPass(const int32 ViewIndex, UWorld& ViewWorld, 
 	// 라이트 디버그 라인은 바운딩 박스 표시 여부와 무관하게 항상 그린다.
 	if (bShowEditorOverlay && !Settings.bDepthView)
 	{
-		if (Settings.bDrawBoundingBox)
+		if (Settings.bDrawBoundingBox && !bPreviewWorld)
 		{
 			LineBatcher->BuildVertexBuffer(ViewWorld);
 		}
-		for (TObjectIterator<UDirectionalLightComponent> DirLight; DirLight; ++DirLight)
+		if (!bPreviewWorld)
 		{
-			if (DirLight && DirLight->GetOwner() && DirLight->GetOwner()->GetWorld() == &ViewWorld)
+			for (TObjectIterator<UDirectionalLightComponent> DirLight; DirLight; ++DirLight)
 			{
-				DirLight->DrawDebug(LineBatcher.get());
+				if (DirLight && DirLight->GetOwner() && DirLight->GetOwner()->GetWorld() == &ViewWorld)
+				{
+					DirLight->DrawDebug(LineBatcher.get());
+				}
 			}
 		}
 		// Point·Spot 라이트의 범위는 선택된 액터의 라이트만 그린다 (Spot의 IsDebugLine이 켜져 있으면 항상).
@@ -726,6 +933,25 @@ void UEditorEngine::RenderOverlayPass(const int32 ViewIndex, UWorld& ViewWorld, 
 				continue;
 			if (Selection.IsSelected(Owner) || LocalLight->ShouldAlwaysDrawDebug())
 				LocalLight->DrawDebug(LineBatcher.get());
+		}
+
+		// 스켈레탈 메시의 뼈 (관절 연결선 + 축)
+		for (TObjectIterator<USkeletalMeshDebugComponent> SkeletalDebug; SkeletalDebug; ++SkeletalDebug)
+		{
+			AActor* Owner = SkeletalDebug->GetOwner();
+			if (!Owner || Owner->GetWorld() != &ViewWorld)
+				continue;
+			if (SkeletalDebug->IsVisible() && SkeletalDebug->ShouldDrawDebug())
+				SkeletalDebug->DrawDebug(LineBatcher.get());
+		}
+
+		for (TObjectIterator<UDecalComponent> Decal; Decal; ++Decal)
+		{
+			AActor* Owner = Decal->GetOwner();
+			if (!Owner || Owner->GetWorld() != &ViewWorld)
+				continue;
+			if (Selection.IsSelected(Owner))
+				Decal->DrawDebug(LineBatcher.get());
 		}
 	}
 
@@ -745,9 +971,9 @@ void UEditorEngine::RenderOverlayPass(const int32 ViewIndex, UWorld& ViewWorld, 
 	// 원근은 픽셀 셰이더 Grid, 직교는 선 Grid를 쓴다 (언리얼 에디터와 같은 구분).
 	if (bShowEditorOverlay && Settings.bDrawGrid)
 	{
-		const EGridPlane GridPlane = MultipleViewportsAdapter.GetGridPlane(ViewIndex);
+		const EGridPlane GridPlane = Adapter.GetGridPlane(ViewIndex);
 
-		if (!MultipleViewportsAdapter.IsOrthographic(ViewIndex))
+		if (!Adapter.IsOrthographic(ViewIndex))
 		{
 			GridRenderer->OnRenderPSGrid(
 				ViewProjection, ViewCameraLocation, Settings, PassInfo.ViewportSetting
@@ -761,8 +987,8 @@ void UEditorEngine::RenderOverlayPass(const int32 ViewIndex, UWorld& ViewWorld, 
 				ViewCameraForward,
 				GridPlane,
 				static_cast<float>(Settings.GridSpacing),
-				!MultipleViewportsAdapter.IsOrthographic(ViewIndex) ||
-				MultipleViewportsAdapter.GetCameraPreset(ViewIndex) == EMultipleViewportsCameraPreset::OrthographicView,
+				!Adapter.IsOrthographic(ViewIndex) ||
+				Adapter.GetCameraPreset(ViewIndex) == EMultipleViewportsCameraPreset::OrthographicView,
 				PassInfo.ViewportSetting
 			);
 		}
@@ -774,13 +1000,15 @@ void UEditorEngine::RenderOverlayPass(const int32 ViewIndex, UWorld& ViewWorld, 
 		return Component && Component->GetOwner() && Component->GetOwner()->GetWorld() == &ViewWorld;
 	};
 
-	// 스텐실 기반이라 선택 대상의 가시성이 꺼져 있어도 외곽선만 그린다.
-	if (bShowEditorOverlay)
+	// 스텐실 기반이라 선택 대상의 가시성이 꺼져 있어도 외곽선만 그린다. 단 Show 설정으로 숨긴 물체는 외곽선도 뺀다.
+	if (bShowEditorOverlay && Settings.bDrawPrimitives)
 	{
 		OutlineRenderer->OnRender(*Outline, ViewProjection, PassInfo.ViewportSetting, &ViewWorld);
 	}
 
-	if (bShowEditorOverlay && IsInViewWorld(Gizmo->GetTarget()))
+	// 뷰어는 레벨 선택과 무관한 자기 기즈모(선택한 뼈)를 쓴다.
+	const FGizmo& ViewGizmo = bPreviewWorld ? SkeletalMeshViewer.GetGizmo() : *Gizmo;
+	if (bShowEditorOverlay && IsInViewWorld(ViewGizmo.GetTarget()))
 	{
 		//auto Target = Cast<UPrimitiveComponent>(Gizmo->GetTarget());
 		//FBox box = Target->CalcBounds();
@@ -788,18 +1016,18 @@ void UEditorEngine::RenderOverlayPass(const int32 ViewIndex, UWorld& ViewWorld, 
 		RenderCommand::ClearDepthStencil(ViewRenderingInfo.DepthStencil.Texture);
 
 		GizmoRenderer->OnRender(
-			*Gizmo,
+			ViewGizmo,
 			ViewProjection,
 			ViewCameraLocation,
-			MultipleViewportsAdapter.IsOrthographic(ViewIndex));
+			Adapter.IsOrthographic(ViewIndex));
 	}
 
 	RenderCommand::ClearDepthStencil(PassInfo.DepthStencil.Texture);
 
-	if (Settings.bShowUUID)
+	if (Settings.bShowUUID && !bPreviewWorld)
 	{
 		// 월드 +Z가 아니라 화면 위쪽으로 띄워야 Top·Bottom처럼 Z축을 따라 보는 View에서도 물체를 가리지 않는다.
-		const FVector ScreenUp = MultipleViewportsAdapter.GetEngineCameraUp(ViewIndex);
+		const FVector ScreenUp = Adapter.GetEngineCameraUp(ViewIndex);
 
 		for (AActor* Actor : ViewWorld.GetPersistentLevel()->GetActors())
 		{
@@ -831,12 +1059,12 @@ void UEditorEngine::RenderOverlayPass(const int32 ViewIndex, UWorld& ViewWorld, 
 				*SystemFont
 			);
 
-			const FMatrix BillboardWorld = MultipleViewportsAdapter.BuildEngineBillboardMatrix(ViewIndex, UUIDLocation, 1.0f, 1.0f);
+			const FMatrix BillboardWorld = Adapter.BuildEngineBillboardMatrix(ViewIndex, UUIDLocation, 1.0f, 1.0f);
 			TextRenderer->OnRender(Text, BillboardWorld, 0.5f, *SystemFont, ViewProjection);
 		}
 	}
 
-	if (GameViewport && IsPlayingView(ViewIndex))
+	if (GameViewport && bPlayingView)
 	{
 		GameViewport->CollectDrawList(PassInfo.ViewportSetting.Width, PassInfo.ViewportSetting.Height);
 		GameViewport->Draw(PassInfo.ViewportSetting.Width, PassInfo.ViewportSetting.Height, *TextRenderer);
@@ -1044,7 +1272,20 @@ void UEditorEngine::SpawnActorFromToolbar(UClass* Class)
 		+ MultipleViewportsAdapter.GetEngineCameraForward(ViewIndex) * SpawnDistance;
 
 	if (AActor* NewActor = EditorWorld->SpawnActor(Class, NAME_None, &SpawnTransform))
+	{
+		if (ADecalActor* DecalActor = Cast<ADecalActor>(NewActor))
+		{
+			UDecalComponent* Decal = DecalActor->GetDecalComponent();
+			if (Decal->ProjectOntoSurface({MultipleViewportsAdapter.GetEngineCameraLocation(ViewIndex),
+				MultipleViewportsAdapter.GetEngineCameraForward(ViewIndex)}))
+			{
+				const FMatrix SurfaceWorld = Decal->GetWorldMatrix();
+				Decal->SetTransform(FTransform::Identity);
+				NewActor->GetRootComponent()->SetWorldTransform(SurfaceWorld, false);
+			}
+		}
 		OutlinerPanel->SelectActor(NewActor);
+	}
 }
 
 void UEditorEngine::CopySelectedActors()
@@ -1072,7 +1313,7 @@ void UEditorEngine::PasteCopiedActors()
 
 // View 하나의 씬을 그린다.
 void UEditorEngine::RenderFrame(const FSceneView& SceneView, const FSceneRenderSettings& Settings, UWorld& ViewWorld, 
-	const FRenderingInfo& SceneRenderingInfo, const FRenderingInfo& ViewRenderingInfo, FTexture2D* FxaaTexture, FRenderQueue& InRenderQueue)
+	const FRenderingInfo& SceneRenderingInfo, const FRenderingInfo& ViewRenderingInfo, FTexture2D* DecalBaseColorTarget, FTexture2D* DecalNormalTarget, FTexture2D* FxaaTexture, FRenderQueue& InRenderQueue)
 {
 	FSceneRenderSettings ViewSettings = Settings;
 	FSceneView View = SceneView;
@@ -1097,7 +1338,7 @@ void UEditorEngine::RenderFrame(const FSceneView& SceneView, const FSceneRenderS
 			}
 		}
 	}
-	else if (LevelSequencerPanel)
+	else if (LevelSequencerPanel && ViewWorld.GetWorldType() == EWorldType::Editor)
 	{
 		float FadeAmount = 0.f;
 		FLinearColor FadeColor;
@@ -1108,7 +1349,7 @@ void UEditorEngine::RenderFrame(const FSceneView& SceneView, const FSceneRenderS
 		}
 	}
 
-	SceneRenderer.Render(ViewWorld, View, ViewSettings, SceneRenderingInfo, ViewRenderingInfo, FxaaTexture, InRenderQueue);
+	SceneRenderer.Render(ViewWorld, View, ViewSettings, SceneRenderingInfo, ViewRenderingInfo, DecalBaseColorTarget, DecalNormalTarget, FxaaTexture, InRenderQueue);
 }
 
 // View Texture가 포함된 UI를 Swapchain 백버퍼에 합성한다. Present는 FEngineLoop가 한다.
@@ -1123,6 +1364,7 @@ void UEditorEngine::PresentFrame()
 		ImGuiRenderer->Begin();
 
 		EditorUI->OnRender();
+		MeshImportWindow.OnRender();
 
 		ImGuiRenderer->End();
 	}
@@ -1135,6 +1377,7 @@ void UEditorEngine::PreExit()
 {
 	// PIE 창이 열린 채 종료하면 Device가 살아 있을 때 Swapchain과 타깃을 먼저 정리한다.
 	DestroyPIEWindow();
+	SkeletalMeshViewer.Close();
 	ImGuiRenderer->Shutdown();
 }
 

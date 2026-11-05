@@ -34,6 +34,7 @@ class UPrimitiveComponent :public USceneComponent
 		PROPERTY(bReceiveShadow)
 		PROPERTY(bGenerateOverlapEvents)
 		PROPERTY(bBlockComponet)
+		PROPERTY(bReceiveDecal)
 		PROPERTY(ShowBeginOverlapLog)
 		PROPERTY(ShowEndOverlapLog)
 		PROPERTY(ShowHitLog)
@@ -51,10 +52,11 @@ public:
 
 	virtual const FStaticMeshData* GetMeshData() const { return nullptr; }
 
-	// Outline처럼 컴포넌트를 통째로 한 번 더 그릴 때 쓰는 GPU 메시.
+	// 렌더러가 이 컴포넌트를 그릴 때 쓰는 자원 (프록시 빠른 경로, 그림자, 오클루전, 아웃라인).
+	// 스태틱은 UStaticMesh 에셋, 스켈레탈은 컴포넌트 전용 FSkeletalMeshObject를 돌려준다.
 	// 메시가 없거나(텍스트) View에 따라 형상이 정해지는 컴포넌트(빌보드·파티클)는
 	// 컴포넌트 월드 행렬만으로 같은 그림을 못 만들므로 nullptr을 돌려준다.
-	virtual UStaticMesh* GetRenderMesh() const { return nullptr; }
+	virtual FMeshRenderResource* GetRenderResource() const { return nullptr; }
 
 	virtual int32 GetNumMaterials() const { return 0; }
 	virtual UMaterial* GetMaterial(int32 SlotIndex) const { return nullptr; }
@@ -133,6 +135,15 @@ public:
 	void SetNotifyScriptCollision(bool bNotify);
 	bool GetNotifyScriptCollision() const;
 
+	bool IsReceiveDecal() const { return bReceiveDecal; }
+	void SetReceiveDecal(bool bInReceiveDecal)
+	{
+		if (bReceiveDecal == bInReceiveDecal)
+			return;
+		bReceiveDecal = bInReceiveDecal;
+		MarkRenderStateDirty();
+	}
+
 protected:
 	bool TraceMesh(const FRay& WorldRay, const FStaticMeshData& Mesh, const FMatrix& WorldMatrix, FHitResult& OutResult);
 	bool TraceMeshLocal(const FRay& LocalRay, const FStaticMeshData& Mesh, float& OutT);
@@ -142,6 +153,7 @@ protected:
 
 	bool bGenerateOverlapEvents = true;
 	bool bBlockComponet = false;
+	bool bReceiveDecal = true;
 
 private:
 	friend class AActor;

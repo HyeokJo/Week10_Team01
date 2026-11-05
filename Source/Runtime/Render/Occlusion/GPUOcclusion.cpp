@@ -192,7 +192,7 @@ void Cull(uint3 Id : SV_DispatchThreadID)
 	// 메시·LOD·셰이더가 같은 드로우 묶음. 조합은 몇 개뿐이라 정렬 없이 묶음에 바로 넣는다.
 	struct FOccluderBucket
 	{
-		UStaticMesh* Mesh;
+		FMeshRenderResource* Mesh;
 		uint32 LOD;
 		FShaderProgram* Shader;
 		std::vector<FOccluderDraw> Draws;

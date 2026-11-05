@@ -136,7 +136,7 @@ void UGameEngine::Tick(float DeltaTime)
 		//RenderSettings.DamageEffectIntensity = 1.0f;
 		RenderSettings.DamageEffectIntensity = Player->GetDamageEffectIntensity();
 	}
-	SceneRenderer.Render(*World, SceneView, RenderSettings, SceneRenderTargets.SceneInfo, SceneRenderTargets.ViewInfo, SceneRenderTargets.FxaaTemp.get(), RenderQueue);
+	SceneRenderer.Render(*World, SceneView, RenderSettings, SceneRenderTargets.SceneInfo, SceneRenderTargets.ViewInfo, SceneRenderTargets.DecalBaseColor.get(), SceneRenderTargets.DecalNormal.get(), SceneRenderTargets.FxaaTemp.get(), RenderQueue);
 
 	// ========== UI 렌더링 ===========
 	FRenderingInfo UIInfo = SceneRenderTargets.ViewInfo;
@@ -147,8 +147,8 @@ void UGameEngine::Tick(float DeltaTime)
 	UIInfo.DepthStencil.Texture = nullptr;
 
 	RenderCommand::BeginRenderPass(UIInfo);
-	GameViewport->CollectDrawList(Width, Height);
-	GameViewport->Draw(Width, Height, TextRenderer);
+	GameViewport->CollectDrawList(static_cast<float>(Width), static_cast<float>(Height));
+	GameViewport->Draw(static_cast<float>(Width), static_cast<float>(Height), TextRenderer);
 	RenderCommand::EndRenderPass();
 	// ================================
 

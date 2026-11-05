@@ -33,6 +33,8 @@
 #include "Component/SphereComponent.h"
 #include "Collision/PhysicsScene.h"
 
+#include "Component/DecalComponent.h"
+
 DECLARE_CYCLE_STAT("Actor Tick", STAT_ActorTick); // Actor 틱 측정
 DECLARE_CYCLE_STAT("Update All Transforms", STAT_UpdateAllTransforms); // 각 Transform의 Update 시간 측정
 DECLARE_CYCLE_STAT("Gather Render Packets", STAT_GatherRenderPackets);
@@ -134,6 +136,8 @@ AActor* UWorld::SpawnActor(UClass* Class, FName InName, const FTransform* Transf
 			Scene.AddFogInfo(Fog->GetUUID(), Fog->GetFogInfo());
 		else if (ULightComponentBase* Light = Cast<ULightComponentBase>(Component))
 			Scene.AddLight(Light);
+		else if (UDecalComponent* Decal = Cast<UDecalComponent>(Component))
+			Scene.AddDecal(Decal);
 	}
 
 	// 4. Level->Actors에 등록
@@ -156,8 +160,8 @@ void UWorld::Tick(float DeltaTime)
 		Scene.UpdateAllTransforms();
 	}
 
-	// 에디터 월드면 더이상 틱을 돌리지 않는다.
-	if (WorldType != EWorldType::Editor)
+	// 에디터·프리뷰 월드면 더이상 틱을 돌리지 않는다.
+	if (!IsEditorOnlyWorld())
 	{
 		//인덱스 for 문 사용 : PostInitializeComponent에서 Spawn하게 될 때 범위 for문이 깨진다
 		for (int32 i = 0; i < NewActorList.Num(); ++i)
@@ -221,6 +225,7 @@ void UWorld::ClearWorld()
 	PhysicsScene.RemoveAllPrimitives();
 	Scene.RemoveAllFogInfo();
 	Scene.RemoveAllLights();
+	Scene.RemoveAllDecals();
 	for (ULevel* Level : Levels)
 	{
 		for (AActor* Actor : Level->Actors)
@@ -245,7 +250,7 @@ void UWorld::GatherRenderPackets(FRenderQueue& RenderQueue, const FLODViewContex
 		SCOPE_CYCLE_COUNTER(STAT_FrustumCull);
 
 		// 컬링 단계에서는 프록시 포인터만 모으고, 컴포넌트 역참조(가시성 확인)는 어차피 컴포넌트를 읽는 Gather로 미룬다.
-		const bool bGameView = WorldType != EWorldType::Editor;
+		const bool bGameView = !IsEditorOnlyWorld();
 		const auto Visit = [&](FPrimitiveSceneProxy* Proxy)
 		{
 			if (bGameView && Proxy->IsHiddenInGame())
@@ -286,7 +291,7 @@ void UWorld::GatherRenderPackets(FRenderQueue& RenderQueue, const FLODViewContex
 			if (Occlusion.GetSettings().bCull)
 			{
 				uint32 Kept = 0;
-				for (uint32 i = 0; i < VisibleProxies.Num(); ++i)
+				for (uint32 i = 0; i < static_cast<uint32>(VisibleProxies.Num()); ++i)
 					if (!Occluded[i])
 						VisibleProxies[Kept++] = VisibleProxies[i];
 				VisibleProxies.SetNum(Kept);
@@ -310,10 +315,10 @@ void UWorld::GatherRenderPackets(FRenderQueue& RenderQueue, const FLODViewContex
 	FTaskPool& Pool = FTaskPool::Get();
 	const uint32 ChunkCount = FMath::Clamp(VisibleCount, 1u, Pool.GetNumThreads() * 4);
 
-	if (GatherChunks.Num() < ChunkCount)
+	if (static_cast<uint32>(GatherChunks.Num()) < ChunkCount)
 		GatherChunks.SetNum(ChunkCount);     // 늘릴 때만. 줄이지 않아야 배열 용량이 계속 재사용된다.
 
-	for (uint32 c = 0; c < GatherChunks.Num(); ++c)   // 이번에 안 쓰는 조각의 묶음도 비워 둔다 (Renderer에 넘기지 않도록)
+	for (uint32 c = 0; c < static_cast<uint32>(GatherChunks.Num()); ++c)   // 이번에 안 쓰는 조각의 묶음도 비워 둔다 (Renderer에 넘기지 않도록)
 	{
 		FGatherChunk& Chunk = GatherChunks[c];
 		Chunk.Packets.Reset();               // 용량은 유지, 개수만 0
@@ -346,7 +351,7 @@ void UWorld::GatherRenderPackets(FRenderQueue& RenderQueue, const FLODViewContex
 			{
 				FGatherChunk& Out = GatherChunks[ChunkIndex];      // 이 조각 전용. 다른 스레드는 절대 안 건드림
 				// (머티리얼, 메시, LOD) 묶음 찾기. 조합이 몇 개뿐이라 선형 탐색이면 충분하고, 바로 전 묶음을 먼저 본다.
-				const auto FindGroup = [&Out](UMaterial* Material, UStaticMesh* Mesh, uint8 LOD) -> FStaticDrawGroup&
+				const auto FindGroup = [&Out](UMaterial* Material, FMeshRenderResource* Mesh, uint8 LOD) -> FStaticDrawGroup&
 					{
 						if (Out.LastGroup < Out.Groups.size())
 						{
@@ -376,7 +381,7 @@ void UWorld::GatherRenderPackets(FRenderQueue& RenderQueue, const FLODViewContex
 					FPrimitiveSceneProxy* Proxy = VisibleProxies[VisibleIndex];   // 읽기만
 					if (!Proxy->IsVisible()) continue;
 
-					UStaticMesh* Mesh = Proxy->GetMesh();
+					FMeshRenderResource* Mesh = Proxy->GetMesh();
 					if (!Mesh)
 					{
 						Out.SlowPathIndices.Add(VisibleIndex);     // 컴포넌트를 건드리는 경로는 메인이 나중에
@@ -472,7 +477,7 @@ void UWorld::GatherRenderPackets(FRenderQueue& RenderQueue, const FLODViewContex
 				}
 
 				// continue 없이 항상 여기까지 와서 새 패킷에 여유 칸을 배정한다.
-				for (uint32 p = FirstNew; p < RenderQueue.Num(); ++p)
+				for (uint32 p = FirstNew; p < static_cast<uint32>(RenderQueue.Num()); ++p)
 				{
 					if (!SlotDest || NextExtraSlot >= MaxSlots) break;
 					FRenderPacket& Packet = RenderQueue[p];
@@ -612,6 +617,10 @@ bool UWorld::DestroyActor(AActor* Actor)
 		{
 			Scene.RemoveLight(Light);
 		}
+		else if (UDecalComponent* Decal = Cast<UDecalComponent>(Component))
+		{
+			Scene.RemoveDecal(Decal);
+		}
 	}
 
 	Actor->RegisterAllActorTickFunctions(false);
@@ -658,7 +667,9 @@ bool UWorld::LineTraceSingle(const FRay& WorldRay, FHitResult& OutHit,
 
 	const auto TraceComponent = [&](FPrimitiveSceneProxy* Proxy, float& InOutNearestT)
 		{
-			if (UStaticMesh* Mesh = Proxy ? Proxy->GetMesh() : nullptr)
+			// 자원이 CPU 삼각형(BVH)을 주면 여기서 바로 검사한다. 스켈레탈처럼 nullptr이면 아래 컴포넌트 경로로 간다
+			const FMeshRenderResource* Mesh = Proxy ? Proxy->GetMesh() : nullptr;
+			if (const FStaticMeshData* PickingData = Mesh ? Mesh->GetPickingData() : nullptr)
 			{
 				if (!Proxy->IsVisible())
 					return false;
@@ -670,19 +681,24 @@ bool UWorld::LineTraceSingle(const FRay& WorldRay, FHitResult& OutHit,
 				};
 
 				float T = InOutNearestT;
-				if (!RayIntersectsMesh(LocalRay, Mesh->GetMeshData(), T))
+				FVector LocalNormal;
+				if (!RayIntersectsMesh(LocalRay, *PickingData, T, &LocalNormal))
 					return false;
 
 				OutHit.HitComponent = Proxy->GetComponent();
 				OutHit.Distance = T;
 				OutHit.ImpactPoint = WorldRay.Origin + WorldRay.Direction * T;
+				OutHit.ImpactNormal = Proxy->GetNormalMatrix().TransformVector(LocalNormal).GetSafeNormal();
+				if (OutHit.ImpactNormal.Dot(WorldRay.Direction) > 0.f)
+					OutHit.ImpactNormal *= -1.f;
 				InOutNearestT = T;
 				return true;
 			}
 
 			UPrimitiveComponent* Component = Proxy ? Proxy->GetComponent() : nullptr;
 
-			if (!Component || !Component->IsVisible())
+			// 컴포넌트는 켜져 있어도 프록시가 숨길 수 있다 (스켈레탈 ShowFlag). 스켈레탈은 BVH가 없어 이 경로로 온다
+			if (!Component || !Component->IsVisible() || !Proxy->IsVisible())
 				return false;
 
 			if (UBillboardComponent* Billboard = Cast<UBillboardComponent>(Component))
@@ -703,6 +719,7 @@ bool UWorld::LineTraceSingle(const FRay& WorldRay, FHitResult& OutHit,
 				}
 
 				OutHit.HitComponent = Billboard;
+				OutHit.ImpactNormal = FVector::ZeroVector;
 				OutHit.Distance = T;
 				OutHit.ImpactPoint = WorldRay.Origin + WorldRay.Direction * T;
 				InOutNearestT = T;
@@ -722,6 +739,7 @@ bool UWorld::LineTraceSingle(const FRay& WorldRay, FHitResult& OutHit,
 			}
 
 			OutHit.HitComponent = Component;
+			OutHit.ImpactNormal = FVector::ZeroVector;
 			OutHit.Distance = T;
 			OutHit.ImpactPoint = WorldRay.Origin + WorldRay.Direction * T;
 			InOutNearestT = T;
@@ -831,6 +849,8 @@ void UWorld::PostDuplicate(bool bDuplicateForPIE)
 				Scene.AddFogInfo(Fog->GetUUID(), Fog->GetFogInfo());
 			else if (ULightComponentBase* Light = Cast<ULightComponentBase>(Component))
 				Scene.AddLight(Light);
+			else if (UDecalComponent* Decal = Cast<UDecalComponent>(Component))
+				Scene.AddDecal(Decal);
 		}
 
 		NewActorList.Add(Actor);   // Tick 등록은 BeginPlay에서 함

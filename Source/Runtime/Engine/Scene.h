@@ -12,6 +12,8 @@
 
 class FLightSceneProxy;
 class ULightComponentBase;
+class UDecalComponent;
+class FDecalSceneProxy;
 
 struct FExponentialHeightFogSceneInfo
 {
@@ -22,6 +24,7 @@ struct FExponentialHeightFogSceneInfo
 class FScene
 {
 public:
+	FScene();
 	void AddPrimitive(UPrimitiveComponent* Component);
 	void RemovePrimitive(UPrimitiveComponent* Component);
 	// 모든 프록시를 한 번에 지운다. 액터를 통째로 지우기 전(ClearWorld)에 불러야 지워진 컴포넌트를 가리키는 프록시가 남지 않는다.
@@ -46,6 +49,10 @@ public:
 
 	void MarkDirty(FPrimitiveSceneProxy* Proxy);
 	void MarkRenderStateDirty(FPrimitiveSceneProxy* Proxy);
+
+	// ShowFlag. 끄면 스켈레탈 메시 프록시의 IsVisible이 false가 되어 렌더·그림자·오클루전·피킹에서 함께 빠진다
+	void SetShowSkeletalMeshes(bool bInShow);
+	bool ShouldShowSkeletalMeshes() const { return bShowSkeletalMeshes; }
 
 	bool IsFrustemCulling(const FLightSceneProxy* Proxy, const FFrustumPlanes* FrustemPlanes) const;
 	bool TryGetLightBounds(const FLightSceneProxy* Proxy, FAABB &OUT) const;
@@ -89,4 +96,19 @@ public:
 	bool bElementListChanged = false;
 	bool bShadowDirty = true;
 	inline static bool bCacheWholeSceneShadows = true;
+
+	void AddDecal(UDecalComponent* Component);
+	void RemoveDecal(UDecalComponent* Component);
+	void RemoveAllDecals();
+
+	void MarkDecalDirty(FDecalSceneProxy* Proxy);
+
+	const TArray<FDecalSceneProxy*>& GetDecalProxies() const { return DecalProxies; }
+	const TBVH<FDecalSceneProxy*>& GetDecalBVH() const { return DecalBVH; }
+private:
+	TArray<FDecalSceneProxy*> DirtyDecals;
+	TArray<FDecalSceneProxy*> DecalProxies;
+	TBVH<FDecalSceneProxy*> DecalBVH;
+	bool bDecalElementListChanged = false;
+	bool bShowSkeletalMeshes = true;
 };

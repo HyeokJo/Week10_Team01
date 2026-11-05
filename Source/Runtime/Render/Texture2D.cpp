@@ -123,6 +123,22 @@ void FTexture2D::CreateViews(ID3D11Device* Device, const D3D11_TEXTURE2D_DESC& I
 			if (FAILED(hr))
 				HTR_LOG(Error, "[Texture2D] CreateShaderResourceView failed (hr=0x{:08X})", (uint32)hr);
 		}
+
+		if (bTypelessDepth)
+		{
+			D3D11_SHADER_RESOURCE_VIEW_DESC StencilDesc{};
+
+			StencilDesc.Format = DXGI_FORMAT_X24_TYPELESS_G8_UINT;
+			StencilDesc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+			StencilDesc.Texture2D.MipLevels = 1;
+
+			hr = Device->CreateShaderResourceView(Texture.Get(), &StencilDesc, StencilSRV.GetAddressOf());
+
+			if (FAILED(hr))
+			{
+				HTR_LOG(Error, "[Texture2D] Create Stencil SRV failed (hr=0x{:08X})", (uint32)hr);
+			}
+		}
 	}
 
 	if ((InDesc.BindFlags & D3D11_BIND_RENDER_TARGET) &&

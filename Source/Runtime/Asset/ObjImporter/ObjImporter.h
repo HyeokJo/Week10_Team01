@@ -11,6 +11,8 @@ class FObjImporter
 {
 public:
 	static TUniquePtr<FStaticMeshData> LoadStaticMeshData(const FString& Path);
+	// .bin을 읽거나 쓰지 않고 파싱만 한다. 원본이 프로젝트 밖일 때 그 폴더에 파일을 남기지 않는다
+	static TUniquePtr<FStaticMeshData> ImportStaticMeshData(const FString& Path);
 
 	// 디버그용 출력
 	static void PrintObjInfo(const FObjInfo& ObjInfo);

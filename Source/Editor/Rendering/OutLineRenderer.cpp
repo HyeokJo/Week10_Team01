@@ -3,6 +3,7 @@
 #include "Asset/AssetManager.h"
 #include "Render/RenderCommand.h"
 #include "Render/RenderResourceManager.h"
+#include "Engine/PrimitiveSceneProxy.h"
 #include "GameFramework/Actor.h"
 
 // 스텐실 마스크·외곽선 두 패스의 Shader와 상수 버퍼를 준비한다.
@@ -48,9 +49,12 @@ void FOutlineRenderer::OnRender(const FOutline& InOutline, const FMatrix& InView
 	TArray<const UPrimitiveComponent*> Targets;
 	for (const UPrimitiveComponent* Target : InOutline.GetTargets())
 	{
-		const UStaticMesh* TargetMesh = Target ? Target->GetRenderMesh() : nullptr;
+		const FMeshRenderResource* TargetMesh = Target ? Target->GetRenderResource() : nullptr;
 		const bool bInViewWorld = !ViewWorld || (Target->GetOwner() && Target->GetOwner()->GetWorld() == ViewWorld);
-		if (TargetMesh && TargetMesh->IndexBuffer && bInViewWorld)
+		// 컴포넌트는 켜져 있는데 프록시만 꺼져 있으면 ShowFlag가 숨긴 것이다. 컴포넌트를 직접 끈 경우는 찾을 수 있게 외곽선을 남긴다
+		const FPrimitiveSceneProxy* Proxy = Target ? Target->GetSceneProxy() : nullptr;
+		const bool bHiddenByShowFlag = Proxy && Target->IsVisible() && !Proxy->IsVisible();
+		if (TargetMesh && TargetMesh->GetIndexBuffer(0) && bInViewWorld && !bHiddenByShowFlag)
 			Targets.Add(Target);
 	}
 	if (Targets.IsEmpty())
@@ -79,12 +83,16 @@ void FOutlineRenderer::OnRender(const FOutline& InOutline, const FMatrix& InView
 
 void FOutlineRenderer::DrawTarget(const UPrimitiveComponent* Target, const FPipelineState& PipelineState, const FMatrix& ViewProj, const FVector4& ViewportAndThickness)
 {
-	UStaticMesh* TargetMesh = Target->GetRenderMesh();
+	const FMeshRenderResource* TargetMesh = Target->GetRenderResource();
 	const FMatrix World = Target->GetWorldMatrix();
 	const FOutlineData Constants = { World, World.Inverse().GetTransposed(), ViewProj, ViewportAndThickness };
 
 	RenderCommand::BindMesh(TargetMesh);
 	RenderCommand::BindPipelineState(PipelineState);
+	if (PipelineState.DepthStencilState == EDepthStencilState::StencilMask)
+	{
+		RenderCommand::SetDepthStencilState(EDepthStencilState::StencilMask, 0x01);
+	}
 	RenderCommand::UpdateBufferData(ConstantBuffer.get(), &Constants, sizeof(Constants));
-	RenderCommand::DrawIndexed(TargetMesh->IndexBuffer->GetIndexCount());
+	RenderCommand::DrawIndexed(TargetMesh->GetIndexBuffer(0)->GetIndexCount());
 }

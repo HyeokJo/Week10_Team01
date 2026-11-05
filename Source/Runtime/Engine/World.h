@@ -96,6 +96,8 @@ public:
 	static void DestroyWorld(UWorld* InWorld);
 
 	bool IsPlayInEditor() const { return WorldType == EWorldType::PIE; }
+	// 게임 로직 없이 편집·표시만 하는 월드
+	bool IsEditorOnlyWorld() const { return WorldType == EWorldType::Editor || WorldType == EWorldType::EditorPreview; }
 
 	static UWorld* GetDuplicatedWorldForPIE(UWorld* InWorld);
 

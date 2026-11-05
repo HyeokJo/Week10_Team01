@@ -10,6 +10,12 @@
 #include "Render/RenderResourceManager.h"
 
 #include "Asset/ObjImporter/ObjImporter.h"
+#include "Asset/FbxImporter/FbxImporter.h"
+#include "Asset/MeshAssetFile.h"
+#include "Component/SkinnedMeshComponent.h"
+#include "Component/StaticMeshComponent.h"
+#include "Render/SkeletalMesh.h"
+#include "UObject/UObjectIterator.h"
 
 #include "Render/GeometryGenerator.h"
 #include "UObject/UObjectGlobals.h"
@@ -36,10 +42,51 @@ namespace
 		}
 	}
 
-	UStaticMesh* CreateStaticMesh(const FStaticMeshData* MeshData)
+	// MaterialSlots(쿡 결과)를 실제 UMaterial로 바꾼다. 스태틱,스켈레탈 공통
+	bool CreateSlotMaterials(const TArray<FStaticMaterialSlot>& Slots, TArray<UMaterial*>& OutMaterials)
+	{
+		UMaterial* DefaultMaterial = UAssetManager::GetAssetByPath<UMaterial>("DefaultMaterial");
+		if (!DefaultMaterial)
+		{
+			return false;
+		}
+
+		for (const FStaticMaterialSlot& Slot : Slots)
+		{
+			UMaterial* Material = UMaterial::CreateInstance(DefaultMaterial);
+			if (!Material)
+			{
+				return false;
+			}
+			Material->BaseColor = Slot.BaseColor;
+			Material->Shininess = Slot.Shininess;
+			Material->SpecularColor = Slot.SpecularColor;
+			if (Material->BaseColor.A < 1.0f)
+			{
+				Material->BlendState = EBlendState::AlphaBlend;
+				Material->DepthStencilState = EDepthStencilState::ReadOnly;
+			}
+
+			if (!Slot.DiffuseTexturePath.empty())
+			{
+				UTexture2D* Texture = UAssetManager::Get().LoadTexture(Slot.DiffuseTexturePath);
+
+				if (Texture)
+				{
+					Material->Textures[0] = Texture;
+				}
+			}
+			SetMaterialTexture(1, Material, Slot.NormalTexturePath, true, false);
+			OutMaterials.Add(Material);
+		}
+		return true;
+	}
+
+	// 새 데이터와 GPU 자원을 모두 만든 뒤 마지막에 교체한다. 실패하면 Mesh는 그대로다 (리임포트가 기존 메시에 쓴다)
+	bool FillStaticMesh(UStaticMesh& Mesh, const FStaticMeshData* MeshData)
 	{
 		if (!MeshData || !MeshData->Vertices.Num() || !MeshData->Indices.Num())
-			return nullptr;
+			return false;
 
 		FStaticMeshData Optimized = *MeshData;
 
@@ -65,60 +112,149 @@ namespace
 		Optimized.OptimizeTriangleOrderForVertexCache();
 		TUniquePtr<FVertexBuffer> VB = RenderCommand::CreateStaticVertexBuffer(Optimized.Vertices.GetData(), sizeof(FVertexPNCT) * static_cast<uint32>(Optimized.Vertices.size()), sizeof(FVertexPNCT));
 		TUniquePtr<FIndexBuffer> IB = RenderCommand::CreateStaticIndexBuffer(Optimized.Indices.GetData(), static_cast<uint32>(Optimized.Indices.size()));
-		if (VB == nullptr || IB == nullptr) return nullptr;
+		if (VB == nullptr || IB == nullptr) return false;
 
-		UStaticMesh* Mesh = NewObject<UStaticMesh>();
-		Mesh->MeshData = std::move(Optimized);
+		TArray<UMaterial*> Materials;
+		if (!CreateSlotMaterials(Optimized.MaterialSlots, Materials))
+		{
+			return false;
+		}
+
+		Mesh.MeshData = std::move(Optimized);
 
 		// Vertex/Index GPU 업로드
-		Mesh->VertexBuffer = std::move(VB);
-		Mesh->IndexBuffer = std::move(IB);
+		Mesh.VertexBuffer = std::move(VB);
+		Mesh.IndexBuffer = std::move(IB);
+		Mesh.Materials = std::move(Materials);
+		Mesh.AdditionalLODs.Reset();   // LOD는 옛 정점으로 만들어졌다
 
-		UMaterial* DefaultMaterial = UAssetManager::GetAssetByPath<UMaterial>("DefaultMaterial");
-		if (!DefaultMaterial)
+		Mesh.MeshData.BuildTriangleBVH();
+		Mesh.RebuildRenderData();
+
+		return true;
+	}
+
+	UStaticMesh* CreateStaticMesh(const FStaticMeshData* MeshData)
+	{
+		UStaticMesh* Mesh = NewObject<UStaticMesh>();
+		if (!FillStaticMesh(*Mesh, MeshData))
 		{
+			delete Mesh;
 			return nullptr;
 		}
+		return Mesh;
+	}
 
-		// MaterialSlots를 실제 UMaterial로 변환
-		for (const FStaticMaterialSlot& Slot : Mesh->MeshData.MaterialSlots)
+	// 스켈레탈 에셋은 정점 버퍼를 만들지 않는다 (포즈마다 달라서 컴포넌트의 FSkeletalMeshObject가 만든다).
+	// 인덱스 버퍼와 머티리얼만 만든다. 실패하면 Mesh는 그대로다
+	bool FillSkeletalMesh(USkeletalMesh& Mesh, TUniquePtr<FSkeletalMeshData> MeshData)
+	{
+		if (!MeshData || MeshData->Vertices.IsEmpty() || MeshData->Indices.IsEmpty() || MeshData->Skeleton.Bones.IsEmpty())
+			return false;
+
+		TUniquePtr<FIndexBuffer> IB = RenderCommand::CreateStaticIndexBuffer(MeshData->Indices.GetData(), static_cast<uint32>(MeshData->Indices.Num()));
+		if (IB == nullptr) return false;
+
+		TArray<UMaterial*> Materials;
+		if (!CreateSlotMaterials(MeshData->MaterialSlots, Materials))
 		{
-			UMaterial* Material = UMaterial::CreateInstance(DefaultMaterial);
-			if (!Material)
-			{
-				return nullptr;
-			}
-			Material->BaseColor = Slot.BaseColor;
-			Material->Shininess = Slot.Shininess;
-			Material->SpecularColor = Slot.SpecularColor;
-			if (Material->BaseColor.A < 1.0f)
-			{
-				Material->BlendState = EBlendState::AlphaBlend;
-				Material->DepthStencilState = EDepthStencilState::ReadOnly;
-			}
-
-			if (!Slot.DiffuseTexturePath.empty())
-			{
-				UTexture2D* Texture = UAssetManager::Get().LoadTexture(Slot.DiffuseTexturePath);
-
-				if (Texture)
-				{
-					Material->Textures[0] = Texture;
-				}
-			}
-			SetMaterialTexture(1, Material, Slot.NormalTexturePath, true, false);
-			Mesh->Materials.Add(Material);
+			return false;
 		}
 
-		Mesh->MeshData.BuildTriangleBVH();
-		Mesh->RebuildRenderData();
+		Mesh.MeshData = std::move(*MeshData);
+		Mesh.IndexBuffer = std::move(IB);
+		Mesh.Materials = std::move(Materials);
+		++Mesh.Revision;
+		return true;
+	}
 
+	USkeletalMesh* CreateSkeletalMesh(TUniquePtr<FSkeletalMeshData> MeshData)
+	{
+		USkeletalMesh* Mesh = NewObject<USkeletalMesh>();
+		if (!FillSkeletalMesh(*Mesh, std::move(MeshData)))
+		{
+			delete Mesh;
+			return nullptr;
+		}
 		return Mesh;
 	}
 
 	FString MakeAssetKey(const FString& Path)
 	{
 		return fs::relative(Path, "Assets").generic_string();
+	}
+
+	bool IsInsideAssetRoot(const fs::path& Path)
+	{
+		std::error_code Error;
+		const fs::path Root = fs::weakly_canonical("Assets", Error);
+		const fs::path Full = fs::weakly_canonical(Path, Error);
+		if (Error)
+		{
+			return false;
+		}
+		return std::mismatch(Root.begin(), Root.end(), Full.begin(), Full.end()).first == Root.end();
+	}
+
+	// Assets 밖의 텍스처를 메시 옆 폴더로 복사하고 슬롯 경로를 바꾼다
+	// 원본이 프로젝트 밖에 있거나 나중에 사라져도, 팀원 PC에서도 에셋이 같은 텍스처를 찾게 된다
+	// bOverwrite: 리임포트는 지난번에 복사한 텍스처를 새 파일로 덮어쓴다 (안 그러면 할 때마다 _1, _2가 쌓인다)
+	void CopyExternalTextures(TArray<FStaticMaterialSlot>& Slots, const FString& AssetPath, const bool bOverwrite = false)
+	{
+		// humanoid.fbx.hasset -> humanoid_Textures
+		const fs::path SourceName = fs::path(FMeshAssetFile::StripExtension(AssetPath)).filename();
+		const fs::path TextureFolder = fs::path(AssetPath).parent_path() / (SourceName.stem().string() + "_Textures");
+
+		TMap<FString, FString> Copied;   // 원본 경로 -> 복사된 경로. 여러 슬롯이 같은 텍스처를 쓴다
+		const auto Localize = [&](FString& TexturePath)
+		{
+			if (TexturePath.empty() || IsInsideAssetRoot(TexturePath))
+				return;
+
+			if (const FString* Found = Copied.Find(TexturePath))
+			{
+				TexturePath = *Found;
+				return;
+			}
+
+			std::error_code Error;
+			fs::create_directories(TextureFolder, Error);
+
+			// 다른 폴더의 같은 이름 텍스처가 서로 덮어쓰지 않게 한다
+			const fs::path FileName = fs::path(TexturePath).filename();
+			fs::path Destination = TextureFolder / FileName;
+			const auto IsTaken = [&](const fs::path& Candidate)
+			{
+				const FString CandidatePath = Candidate.generic_string();
+				for (const auto& [Source, Local] : Copied)
+				{
+					if (Local == CandidatePath)
+						return true;
+				}
+				return !bOverwrite && fs::exists(Candidate, Error);
+			};
+			for (int32 Suffix = 1; IsTaken(Destination); ++Suffix)
+			{
+				Destination = TextureFolder / std::format("{}_{}{}", FileName.stem().string(), Suffix, FileName.extension().string());
+			}
+
+			fs::copy_file(TexturePath, Destination, fs::copy_options::overwrite_existing, Error);
+			if (Error)
+			{
+				HTR_LOG(Warning, "[IMPORT] cannot copy texture '{}': {}", TexturePath, Error.message());
+				return;
+			}
+
+			const FString LocalPath = Destination.generic_string();
+			Copied.Add(TexturePath, LocalPath);
+			TexturePath = LocalPath;
+		};
+
+		for (FStaticMaterialSlot& Slot : Slots)
+		{
+			Localize(Slot.DiffuseTexturePath);
+			Localize(Slot.NormalTexturePath);
+		}
 	}
 }
 
@@ -194,11 +330,36 @@ void UAssetManager::LoadAsset(const FString& Key, const FString& Path)
 	}
 	if (Extension == ".obj")
 	{
-		LoadObjStaticMesh(Path);
+		// 임포트한 에셋이 있으면 그것을 쓴다. 없으면 코드와 씬이 참조하는 메시가 계속 로드되도록 자동으로 읽는다
+		if (!LoadMeshAsset(FMeshAssetFile::MakeAssetPath(Path)))
+		{
+			LoadObjStaticMesh(Path);
+		}
 	}
 	if (Extension == ".sequence")
 	{
 		LoadLevelSequence(Path);
+	}
+
+	// 메시 파일은 대소문자가 섞여 들어온다 (.FBX)
+	FString LowerExtension = Extension;
+	std::transform(LowerExtension.begin(), LowerExtension.end(), LowerExtension.begin(),
+		[](const unsigned char Character) { return static_cast<char>(std::tolower(Character)); });
+
+	// 원본이 없어도 이 파일만으로 로드된다
+	if (LowerExtension == FMeshAssetFile::Extension)
+	{
+		LoadMeshAsset(Path);
+	}
+	if (LowerExtension == ".fbx")
+	{
+		// FBX는 옵션을 골라야 하므로 여기서 파싱하지 않는다. 임포트 결과가 없거나 읽지 못하면(버전 차이, 손상)
+		// 목록에 남겨 에디터가 임포트 창을 띄우게 한다. 게임은 창이 없으므로 이 메시 없이 시작한다
+		if (!LoadMeshAsset(FMeshAssetFile::MakeAssetPath(Path)))
+		{
+			HTR_LOG(Warning, "FBX not imported: {}", Path);
+			UnimportedFbxPaths.Add(Path);
+		}
 	}
 }
 
@@ -374,6 +535,14 @@ void UAssetManager::RegisterAsset(const FString& Key, UAsset* Asset)
 {
 	Asset->SetPath(Key);
 	AssetMap[Key] = Asset;
+
+	// 이 에셋이 없는 상태로 열린 씬이 있으면 원래 참조로 되돌린다
+	AssetReferenceSerialization::ResolveMissing(Key, Asset);
+}
+
+FString UAssetManager::GetAssetKeyFromPath(const FString& Path)
+{
+	return MakeAssetKey(Path);
 }
 
 UTexture2D* UAssetManager::LoadTexture(const FString& InPath, bool bGenerateMips, bool bSRGB)
@@ -474,6 +643,185 @@ ULevelSequence* UAssetManager::LoadLevelSequence(const FString& Path)
 	Get().RegisterAsset(Key, LevelSequence);
 
 	return LevelSequence;
+}
+
+bool UAssetManager::LoadMeshAsset(const FString& AssetPath)
+{
+	// 같은 폴더의 원본을 스캔할 때 이미 읽었을 수 있다
+	const FString Key = MakeAssetKey(FMeshAssetFile::StripExtension(AssetPath));
+	if (GetAssetByPath<UAsset>(Key))
+	{
+		return true;
+	}
+
+	if (!FMeshAssetFile::Exists(AssetPath))
+	{
+		return false;
+	}
+
+	FMeshAssetContents Contents;
+	if (!FMeshAssetFile::Read(AssetPath, Contents))
+	{
+		return false;
+	}
+
+	UAsset* Mesh = nullptr;
+	if (Contents.Info.Type == EMeshAssetType::Skeletal)
+	{
+		Mesh = CreateSkeletalMesh(std::move(Contents.SkeletalMesh));
+	}
+	else
+	{
+		Mesh = CreateStaticMesh(Contents.StaticMesh.get());
+	}
+
+	if (!Mesh)
+	{
+		return false;
+	}
+
+	Get().RegisterAsset(Key, Mesh);
+	return true;
+}
+
+UAsset* UAssetManager::ImportMesh(const FString& SourcePath, const FString& AssetPath, const FFbxImportOptions& Option)
+{
+	const FString Key = MakeAssetKey(FMeshAssetFile::StripExtension(AssetPath));
+
+	FString Extension = fs::path(SourcePath).extension().string();
+	std::transform(Extension.begin(), Extension.end(), Extension.begin(),
+		[](const unsigned char Character) { return static_cast<char>(std::tolower(Character)); });
+
+	// 같은 키에 에셋은 하나뿐이다. 스킨이 있으면 스켈레탈로, 아니면(또는 실패하면) 스태틱으로 만든다
+	if (Extension == ".fbx" && Option.bImportSkeletalMesh)
+	{
+		if (TUniquePtr<FSkeletalMeshData> Data = FFbxImporter::LoadSkeletalMeshData(SourcePath, Option))
+		{
+			CopyExternalTextures(Data->MaterialSlots, AssetPath);
+			FMeshAssetFile::Write(AssetPath, SourcePath, Option, *Data);
+
+			USkeletalMesh* Mesh = CreateSkeletalMesh(std::move(Data));
+			if (Mesh)
+			{
+				Get().RegisterAsset(Key, Mesh);
+			}
+			return Mesh;
+		}
+	}
+
+	TUniquePtr<FStaticMeshData> Data;
+	if (Extension == ".obj")
+	{
+		Data = FObjImporter::ImportStaticMeshData(SourcePath);
+	}
+	else if (Extension == ".fbx" && Option.bImportStaticMesh)
+	{
+		Data = FFbxImporter::LoadStaticMeshData(SourcePath, Option);
+	}
+	if (!Data)
+	{
+		return nullptr;
+	}
+
+	CopyExternalTextures(Data->MaterialSlots, AssetPath);
+	UStaticMesh* Mesh = CreateStaticMesh(Data.get());
+	if (!Mesh)
+	{
+		return nullptr;
+	}
+
+	FMeshAssetFile::Write(AssetPath, SourcePath, Option, *Data);
+	Get().RegisterAsset(Key, Mesh);
+	return Mesh;
+}
+
+bool UAssetManager::ReimportMesh(const FString& SourcePath, const FString& AssetPath, const FFbxImportOptions& Option)
+{
+	UAsset* Existing = GetAssetByPath<UAsset>(MakeAssetKey(FMeshAssetFile::StripExtension(AssetPath)));
+
+	FString Extension = fs::path(SourcePath).extension().string();
+	std::transform(Extension.begin(), Extension.end(), Extension.begin(),
+		[](const unsigned char Character) { return static_cast<char>(std::tolower(Character)); });
+
+	// 포인터를 그대로 두고 내용만 바꾼다. 씬·컴포넌트·다른 에셋이 들고 있는 참조를 찾아다닐 필요가 없다
+	// 그래서 종류는 바꿀 수 없다 (컴포넌트의 프로퍼티 타입이 메시 종류에 묶여 있다)
+	if (USkeletalMesh* Skeletal = Cast<USkeletalMesh>(Existing))
+	{
+		if (Extension != ".fbx")
+		{
+			HTR_LOG(Warning, "[IMPORT] {}: a skeletal mesh can only be reimported from an FBX", AssetPath);
+			return false;
+		}
+
+		FFbxImportOptions SkeletalOption = Option;
+		SkeletalOption.bImportSkeletalMesh = true;
+		TUniquePtr<FSkeletalMeshData> Data = FFbxImporter::LoadSkeletalMeshData(SourcePath, SkeletalOption);
+		if (!Data)
+		{
+			return false;
+		}
+
+		CopyExternalTextures(Data->MaterialSlots, AssetPath, true);
+
+		const int32 PreviousSlotCount = Skeletal->GetMeshData().MaterialSlots.Num();
+		if (!FillSkeletalMesh(*Skeletal, std::move(Data)))
+		{
+			return false;
+		}
+		// Fill이 데이터를 옮겨 가서 메시 쪽을 저장한다. 실패해도 메모리의 메시는 이미 새것이라 컴포넌트는 갱신한다
+		const bool bWritten = FMeshAssetFile::Write(AssetPath, SourcePath, SkeletalOption, Skeletal->GetMeshData());
+
+		for (TObjectIterator<USkinnedMeshComponent> Component; Component; ++Component)
+		{
+			if (Component->GetSkeletalMesh() == Skeletal)
+			{
+				Component->OnMeshReimported(PreviousSlotCount);
+			}
+		}
+		return bWritten;
+	}
+
+	if (UStaticMesh* Static = Cast<UStaticMesh>(Existing))
+	{
+		FFbxImportOptions StaticOption = Option;
+		StaticOption.bImportStaticMesh = true;
+		StaticOption.bImportSkeletalMesh = false;
+
+		TUniquePtr<FStaticMeshData> Data;
+		if (Extension == ".obj")
+		{
+			Data = FObjImporter::ImportStaticMeshData(SourcePath);
+		}
+		else if (Extension == ".fbx")
+		{
+			Data = FFbxImporter::LoadStaticMeshData(SourcePath, StaticOption);
+		}
+		if (!Data)
+		{
+			return false;
+		}
+
+		CopyExternalTextures(Data->MaterialSlots, AssetPath, true);
+
+		const int32 PreviousSlotCount = Static->GetMeshData().MaterialSlots.Num();
+		if (!FillStaticMesh(*Static, Data.get()))
+		{
+			return false;
+		}
+		const bool bWritten = FMeshAssetFile::Write(AssetPath, SourcePath, StaticOption, *Data);
+
+		for (TObjectIterator<UStaticMeshComponent> Component; Component; ++Component)
+		{
+			if (Component->GetStaticMesh() == Static)
+			{
+				Component->OnMeshReimported(PreviousSlotCount);
+			}
+		}
+		return bWritten;
+	}
+
+	// 파일이 깨져서 로드되지 못한 에셋이다. 바꿀 객체가 없으니 새로 임포트해서 그 자리에 쓴다
+	return ImportMesh(SourcePath, AssetPath, Option) != nullptr;
 }
 
 bool UAssetManager::ReorientStaticMesh(UStaticMesh& Mesh, const std::function<FVector(const FVector&)>& Rotate)

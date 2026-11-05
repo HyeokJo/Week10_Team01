@@ -170,6 +170,13 @@ void FJsonArchiveOutputFormatter::Serialize(FName& Value)
 
 void FJsonArchiveOutputFormatter::Serialize(UObject*& Value)
 {
+	// 불러올 때 못 찾은 에셋은 지금 값(기본값) 대신 원래 키를 그대로 쓴다
+	if (const FString* PendingPath = AssetReferenceSerialization::GetPendingSavePath())
+	{
+		Top() = *PendingPath;
+		return;
+	}
+
 	// 패키지가 없으므로 에셋 경로가 참조의 식별자 역할을 한다
 	UAsset* Asset = Cast<UAsset>(Value);
 	if (Asset && !Asset->GetPath().empty())

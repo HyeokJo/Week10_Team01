@@ -130,6 +130,54 @@ FString FEditorFileUtils::OpenSaveSceneDialog()
 	return FString();
 }
 
+TArray<FString> FEditorFileUtils::OpenImportMeshDialog()
+{
+	TArray<FString> Paths;
+
+	// 여러 개를 고르면 결과가 "폴더\0파일\0파일\0\0" 형식으로 와서 큰 버퍼가 필요하다
+	TArray<char> Buffer;
+	Buffer.SetNum(64 * 1024);
+	Buffer[0] = '\0';
+
+	OPENFILENAMEA ofn = {};
+	ofn.lStructSize = sizeof(OPENFILENAMEA);
+	ofn.hwndOwner = nullptr;
+	ofn.lpstrFile = Buffer.GetData();
+	ofn.nMaxFile = static_cast<DWORD>(Buffer.Num());
+	ofn.lpstrFilter =
+		"Mesh Files (*.fbx;*.obj)\0*.fbx;*.obj\0"
+		"All Files (*.*)\0*.*\0";
+
+	// 엔진은 상대 경로로 에셋을 찾으므로 작업 폴더가 바뀌면 안 된다 (OFN_NOCHANGEDIR)
+	ofn.Flags =
+		OFN_FILEMUSTEXIST |
+		OFN_PATHMUSTEXIST |
+		OFN_NOCHANGEDIR |
+		OFN_ALLOWMULTISELECT |
+		OFN_EXPLORER;
+
+	if (!GetOpenFileNameA(&ofn))
+	{
+		return Paths;
+	}
+
+	const char* Cursor = Buffer.GetData();
+	const std::filesystem::path First(Cursor);
+	Cursor += std::strlen(Cursor) + 1;
+	if (*Cursor == '\0')
+	{
+		// 하나만 고르면 전체 경로 하나로 온다
+		Paths.Add(First.generic_string());
+		return Paths;
+	}
+
+	for (; *Cursor != '\0'; Cursor += std::strlen(Cursor) + 1)
+	{
+		Paths.Add((First / Cursor).generic_string());
+	}
+	return Paths;
+}
+
 FString FEditorFileUtils::OpenLoadSceneDialog()
 {
 	char FilePath[MAX_PATH] = {};

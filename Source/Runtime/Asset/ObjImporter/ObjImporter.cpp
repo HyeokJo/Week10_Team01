@@ -541,6 +541,16 @@ TUniquePtr<FStaticMeshData> FObjImporter::LoadStaticMeshData(const FString& Path
 		return Baked;
 	}
 
+	TUniquePtr<FStaticMeshData> Data = ImportStaticMeshData(Path);
+	if (Data)
+	{
+		FStaticMeshBake::WriteBaked(BinPath, *Data);
+	}
+	return Data;
+}
+
+TUniquePtr<FStaticMeshData> FObjImporter::ImportStaticMeshData(const FString& Path)
+{
 	FObjInfo Info;
 	TUniquePtr<FStaticMeshData> Data = MakeUnique<FStaticMeshData>();
 
@@ -548,8 +558,6 @@ TUniquePtr<FStaticMeshData> FObjImporter::LoadStaticMeshData(const FString& Path
 	{
 		return nullptr;
 	}
-
-	FStaticMeshBake::WriteBaked(BinPath, *Data);
 	return Data;
 }
 

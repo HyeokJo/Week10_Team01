@@ -200,6 +200,11 @@ void FRenderDevice::CreateStates()
 		Desc.CullMode = D3D11_CULL_NONE;
 		Device->CreateRasterizerState(&Desc, RasterizerStates[(uint8)ERasterizerState::Wireframe].GetAddressOf());
 
+		// 선의 덮인 비율을 알파에 곱한다. AlphaBlend와 함께 써야 효과가 있다
+		Desc.FillMode = D3D11_FILL_SOLID;
+		Desc.AntialiasedLineEnable = TRUE;
+		Device->CreateRasterizerState(&Desc, RasterizerStates[(uint8)ERasterizerState::AntialiasedLine].GetAddressOf());
+
 		// 섀도우 맵 렌더 전용: Shadow Pancaking (DepthClipEnable = FALSE) 및 하드웨어 Slope-Scaled Depth Bias 적용
 		D3D11_RASTERIZER_DESC ShadowDesc = {};
 		ShadowDesc.FillMode = D3D11_FILL_SOLID;
@@ -210,6 +215,16 @@ void FRenderDevice::CreateStates()
 		ShadowDesc.SlopeScaledDepthBias = 2.0f;
 		ShadowDesc.DepthBiasClamp = 0.0f;
 		Device->CreateRasterizerState(&ShadowDesc, RasterizerStates[(uint8)ERasterizerState::ShadowDepth].GetAddressOf());
+
+		D3D11_RASTERIZER_DESC ScissorDesc = {};
+
+		ScissorDesc.FillMode = D3D11_FILL_SOLID;
+		ScissorDesc.CullMode = D3D11_CULL_NONE;
+		ScissorDesc.FrontCounterClockwise = FALSE;
+		ScissorDesc.DepthClipEnable = TRUE;
+		ScissorDesc.ScissorEnable = TRUE;
+
+		Device->CreateRasterizerState(&ScissorDesc, RasterizerStates[(uint8)ERasterizerState::SolidNoneScissor].GetAddressOf());
 	}
 
 	// ---------- DepthStencil ----------
@@ -225,16 +240,21 @@ void FRenderDevice::CreateStates()
 		Desc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
 		Device->CreateDepthStencilState(&Desc, DepthStencilStates[(uint8)EDepthStencilState::ReadOnly].GetAddressOf());
 
+		Desc.DepthFunc = D3D11_COMPARISON_LESS_EQUAL;
+		Device->CreateDepthStencilState(&Desc, DepthStencilStates[(uint8)EDepthStencilState::ReadOnlyLessEqual].GetAddressOf());
+
+		Desc.DepthFunc = D3D11_COMPARISON_LESS;
+
 		Desc.DepthEnable = FALSE;
 		Device->CreateDepthStencilState(&Desc, DepthStencilStates[(uint8)EDepthStencilState::Disabled].GetAddressOf());
 
 		// 깊이 없이 선택 메시 영역의 스텐실을 올린다 (참조값 0 기준).
 		Desc.StencilEnable = TRUE;
-		Desc.StencilReadMask = D3D11_DEFAULT_STENCIL_READ_MASK;
-		Desc.StencilWriteMask = D3D11_DEFAULT_STENCIL_WRITE_MASK;
+		Desc.StencilReadMask = 0x01;
+		Desc.StencilWriteMask = 0x01;
 		Desc.FrontFace.StencilFailOp = D3D11_STENCIL_OP_KEEP;
 		Desc.FrontFace.StencilDepthFailOp = D3D11_STENCIL_OP_KEEP;
-		Desc.FrontFace.StencilPassOp = D3D11_STENCIL_OP_INCR_SAT;
+		Desc.FrontFace.StencilPassOp = D3D11_STENCIL_OP_REPLACE;
 		Desc.FrontFace.StencilFunc = D3D11_COMPARISON_ALWAYS;
 		Desc.BackFace = Desc.FrontFace;
 		Device->CreateDepthStencilState(&Desc, DepthStencilStates[(uint8)EDepthStencilState::StencilMask].GetAddressOf());
@@ -245,6 +265,23 @@ void FRenderDevice::CreateStates()
 		Desc.FrontFace.StencilFunc = D3D11_COMPARISON_EQUAL;
 		Desc.BackFace = Desc.FrontFace;
 		Device->CreateDepthStencilState(&Desc, DepthStencilStates[(uint8)EDepthStencilState::StencilOutline].GetAddressOf());
+
+		// Opaque 메시가 실제 Depth를 통과할 때 Receive Decal 여부를 기록한다.
+		D3D11_DEPTH_STENCIL_DESC DecalReceiverDesc{};
+
+		DecalReceiverDesc.DepthEnable = TRUE;
+		DecalReceiverDesc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
+		DecalReceiverDesc.DepthFunc = D3D11_COMPARISON_LESS;
+		DecalReceiverDesc.StencilEnable = TRUE;
+		DecalReceiverDesc.StencilReadMask = 0x80;
+		DecalReceiverDesc.StencilWriteMask = 0x80;
+		DecalReceiverDesc.FrontFace.StencilFailOp = D3D11_STENCIL_OP_KEEP;
+		DecalReceiverDesc.FrontFace.StencilDepthFailOp = D3D11_STENCIL_OP_KEEP;
+		DecalReceiverDesc.FrontFace.StencilPassOp = D3D11_STENCIL_OP_REPLACE;
+		DecalReceiverDesc.FrontFace.StencilFunc = D3D11_COMPARISON_ALWAYS;
+		DecalReceiverDesc.BackFace = DecalReceiverDesc.FrontFace;
+
+		Device->CreateDepthStencilState(&DecalReceiverDesc, DepthStencilStates[(uint8)EDepthStencilState::DecalReceiverMask].GetAddressOf());
 	}
 
 	// ---------- Blend ----------

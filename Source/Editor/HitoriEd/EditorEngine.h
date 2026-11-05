@@ -31,6 +31,9 @@
 #include "Editor/Rendering/OutLineRenderer.h"
 #include "Editor/Outliner/OutlinerPanel.h"
 #include "Editor/HitoriEd/EditorSelection.h"
+#include "Editor/SkeletalMeshViewer/SkeletalMeshViewer.h"
+#include "Editor/SkeletalMeshViewer/SkeletalMeshViewerPanel.h"
+#include "Editor/AssetImport/MeshImportWindow.h"
 
 #include "Render/SkyboxRenderer.h"
 
@@ -55,7 +58,7 @@ public:
 	void UpdateGizmoAndPicking();
 	// View 하나의 씬을 그린다.
 	// 씬은 SceneRenderingInfo(Linear float)에 그리고, 인코딩한 결과와 에디터 표시는 ViewRenderingInfo(sRGB)에 그린다.
-	void RenderFrame(const FSceneView& SceneView, const FSceneRenderSettings& Settings, UWorld& ViewWorld, const FRenderingInfo& SceneRenderingInfo, const FRenderingInfo& ViewRenderingInfo, FTexture2D* FxaaTexture, FRenderQueue& InRenderQueue);
+	void RenderFrame(const FSceneView& SceneView, const FSceneRenderSettings& Settings, UWorld& ViewWorld, const FRenderingInfo& SceneRenderingInfo, const FRenderingInfo& ViewRenderingInfo, FTexture2D* DecalBaseColorTarget, FTexture2D* DecalNormalTarget, FTexture2D* FxaaTexture, FRenderQueue& InRenderQueue);
 	// 네 View 결과와 ImGui를 메인 Swapchain 백버퍼에 합성한다. Present는 FEngineLoop가 한다.
 	void PresentFrame();
 	void DeleteActor(AActor* Actor);
@@ -91,6 +94,16 @@ private:
 	void TickWorldAndEditor(float DeltaTime);
 	// 한 번 캡처한 월드 결과를 재사용해 현재 레이아웃의 각 View를 렌더한다.
 	void RenderMultipleViewports();
+	// 창에서 Import를 누른 파일을 임포트한다. 메시와 텍스처를 만들므로 프레임 시작에 부른다.
+	void ProcessMeshImportRequest();
+	// 패널에서 온 열기·닫기 요청을 처리한다. ImGui 그리기 도중에 월드를 만들거나 지우지 않도록 프레임 시작에 부른다.
+	void ProcessSkeletalMeshViewerRequests();
+	// 단축키가 레벨이 아니라 뷰어를 향하는가. 레벨 뷰포트 위에 커서가 있으면 레벨이 우선이다.
+	bool IsSkeletalMeshViewerActive() const;
+	// 뷰어 크기를 맞추고, 뷰어가 이번 프레임 카메라 입력을 가져가면 true를 반환한다.
+	bool UpdateSkeletalMeshViewerInput(float DeltaTime);
+	// 열려 있는 스켈레탈 메시 뷰어의 프리뷰 월드를 자기 타깃에 그린다.
+	void RenderSkeletalMeshViewer(const FSceneRenderSettings& Settings);
 	// PIE View가 PlayWorld 메인 카메라로 보이도록 Adapter Override를 갱신하고 게임 카메라 입력을 켜고 끈다.
 	void UpdatePIEViewCamera();
 
@@ -107,11 +120,11 @@ private:
 	// 화면 합성과 View 설정 보관으로 프레임을 마무리한다.
 	void EndFrame();
 
-	FSceneView MakeSceneView(int32 ViewIndex) const;
+	FSceneView MakeSceneView(const FMultipleViewportsAdapter& Adapter, int32 ViewIndex) const;
 	FSceneRenderSettings MakeSceneRenderSettings() const;
 
 	//Overlay Pass
-	void RenderOverlayPass(const int32 ViewIndex, UWorld& ViewWorld, const FRenderingInfo& ViewRenderingInfo, const FMatrix& ViewProjection, const FVector& ViewCameraLocation, const FVector& ViewCameraForward, FRenderQueue& RenderQueue);
+	void RenderOverlayPass(const FMultipleViewportsAdapter& Adapter, const int32 ViewIndex, UWorld& ViewWorld, const FRenderingInfo& ViewRenderingInfo, const FMatrix& ViewProjection, const FVector& ViewCameraLocation, const FVector& ViewCameraForward, FRenderQueue& RenderQueue);
 
 	FWorldContext* GetPIEWorldContext(int32 WorldPIEInstance = 0);
 	UWorld* GetActiveWorld() const { return PlayWorld ? PlayWorld : EditorWorld; }
@@ -151,6 +164,10 @@ private:
 	FOutlinerPanel* OutlinerPanel = nullptr;
 	FContentDrawerPanel* ContentDrawerPanel = nullptr;
 	FLevelSequencePanel* LevelSequencerPanel = nullptr;
+	FSkeletalMeshViewer SkeletalMeshViewer;
+	FSkeletalMeshViewerPanel* SkeletalMeshViewerPanel = nullptr;
+	FString PendingViewerFbxPath;
+	FMeshImportWindow MeshImportWindow;
 
 	UWorld* EditorWorld = nullptr;
 	UWorld* PlayWorld = nullptr;

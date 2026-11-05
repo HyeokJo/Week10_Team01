@@ -108,6 +108,15 @@ bool RenderUtil::IsCsoUpToDate(const FString& ShaderPath, const FString& CsoPath
 	const auto CsoTime = fs::last_write_time(CsoPath, Ec);
 	if (Ec) return false;
 
+	// Shared shader code must invalidate cached callers as well.
+	for (const fs::directory_entry& Entry : fs::directory_iterator(fs::path(ShaderPath).parent_path(), Ec))
+	{
+		if (Entry.path().extension() != ".hlsli") continue;
+		const auto IncludeTime = fs::last_write_time(Entry.path(), Ec);
+		if (Ec || IncludeTime >= CsoTime) return false;
+	}
+	if (Ec) return false;
+
 	return CsoTime > SrcTime;
 }
 
